@@ -18,7 +18,8 @@ class HomeScreen extends StatelessWidget {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text("Hello, User"),
+        title: const Text("Hello, User", ),
+        
         centerTitle: true,
         actions: const [
           Padding(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:kseb_connect/screens/profile_screen.dart';
 import 'home_screen.dart';
 import 'my_complaints_screen.dart';
 
@@ -25,7 +26,7 @@ void initState() {
     }),
     const MyComplaintsScreen(),
     const Placeholder(),
-    const Placeholder(),
+    const ProfileScreen(),
   ];
 }
 
