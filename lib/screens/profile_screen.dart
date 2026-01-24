@@ -1,128 +1,290 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart'; // 1. Import this
+import 'package:kseb_connect/screens/login_screen.dart';
+import '../main.dart'; // supabase client
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
   @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  String userName = '';
+  String phoneNumber = '';
+  String joinDate = '';
+  bool loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchUserProfile();
+  }
+
+  Future<void> fetchUserProfile() async {
+    try {
+      final userId = supabase.auth.currentUser!.id;
+
+      final data = await supabase
+          .from('users')
+          .select('name, mobile_number, created_at')
+          .eq('id', userId)
+          .single();
+
+      final createdAt = DateTime.parse(data['created_at']);
+
+      setState(() {
+        userName = data['name'];
+        phoneNumber = data['mobile_number'];
+        joinDate = "${_monthName(createdAt.month)}-${createdAt.year}";
+        loading = false;
+      });
+    } catch (e) {
+      debugPrint("Profile fetch error: $e");
+      setState(() => loading = false);
+    }
+  }
+
+  String _monthName(int month) {
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+    return months[month - 1];
+  }
+
+  @override
   Widget build(BuildContext context) {
+    const navyBlue = Color(0xFF0D3B66);
+    const backgroundGrey = Color(0xFFF5F5F5);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F2F2),
-      appBar: AppBar(
-        title: const Text("My Profile"),
-        centerTitle: true,
-        leading: const SizedBox(), // ❌ No back button because it's a tab
-        actions: const [
-          Padding(
-            padding: EdgeInsets.only(right: 12),
-            child: Icon(Icons.notifications),
-          )
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _profileHeader(),
-            const SizedBox(height: 20),
-            _section("Manage", [
-              _tile(Icons.list_alt, "My Complaints"),
-              _tile(Icons.person, "Profile"),
-            ]),
-            const SizedBox(height: 16),
-            _section("Settings", [
-              _tile(Icons.settings, "Account settings"),
-              _tile(Icons.notifications, "Notification settings"),
-              _tile(Icons.feedback, "Feedback"),
-            ]),
-            const SizedBox(height: 16),
-            _section("Others", [
-              _tile(Icons.info, "About us"),
-              _tile(Icons.help_outline, "FAQ"),
-            ]),
-            const SizedBox(height: 20),
-            _dangerButton("Delete my account"),
-            const SizedBox(height: 10),
-            _logoutButton(),
-          ],
+      backgroundColor: backgroundGrey,
+
+      // --- Body ---
+      body: loading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 1. Profile Header Section
+                  Row(
+                    children: [
+                      // --- CHANGED: SVG Profile Icon ---
+                      ClipOval(
+                        child: SvgPicture.asset(
+                          'assets/profile.svg', // Your SVG file path
+                          width: 70, // Equivalent to radius 35 * 2
+                          height: 70,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+
+                      const SizedBox(width: 15),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            userName,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            "Ownest member since $joinDate",
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            "Phone: $phoneNumber",
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 30),
+
+                  _buildSectionHeader("Manage"),
+                  _buildListContainer([
+                    _buildListTile(Icons.notes, "My Complaints", onTap: () {}),
+                    _buildListTile(
+                      Icons.account_balance_wallet_outlined,
+                      "Profile",
+                      onTap: () {},
+                    ),
+                  ]),
+
+                  const SizedBox(height: 20),
+
+                  _buildSectionHeader("Settings"),
+                  _buildListContainer([
+                    _buildListTile(
+                      Icons.account_circle_outlined,
+                      "Account settings",
+                      onTap: () {},
+                    ),
+                    _buildListTile(
+                      Icons.notifications_none,
+                      "Notification settings",
+                      onTap: () {},
+                    ),
+                    _buildListTile(
+                      Icons.help_outline,
+                      "Feedback",
+                      onTap: () {},
+                    ),
+                  ]),
+
+                  const SizedBox(height: 20),
+
+                  _buildSectionHeader("Others"),
+                  _buildListContainer([
+                    _buildListTile(
+                      Icons.info_outline,
+                      "About us",
+                      onTap: () {},
+                    ),
+                    _buildListTile(
+                      Icons.question_answer_outlined,
+                      "FAQ",
+                      onTap: () {},
+                    ),
+                  ]),
+
+                  const SizedBox(height: 30),
+
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: OutlinedButton.icon(
+                      onPressed: () {},
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        color: Colors.grey,
+                      ),
+                      label: const Text(
+                        "Delete my account",
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 15),
+
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        await supabase.auth.signOut();
+
+                        if (!mounted) return;
+
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const LoginScreen(),
+                          ),
+                          (route) => false,
+                        );
+                      },
+                      icon: const Icon(Icons.logout, color: Colors.white),
+                      label: const Text(
+                        "Log out",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4CA0D9),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(25),
+                        ),
+                        elevation: 0,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10, left: 4),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          color: Colors.black87,
         ),
       ),
     );
   }
 
-  Widget _profileHeader() {
-    return Row(
-      children: [
-        const CircleAvatar(
-          radius: 30,
-          backgroundImage: NetworkImage(
-              "https://i.pravatar.cc/150?img=11"),
-        ),
-        const SizedBox(width: 12),
-        const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("Ananthu",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            Text("Ownest member since Jan-2026"),
-            Text("Phone: +91 9876543210"),
-          ],
-        )
-      ],
+  Widget _buildListContainer(List<Widget> children) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(children: children),
     );
   }
 
-  Widget _section(String title, List<Widget> children) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(children: children),
-        )
-      ],
-    );
-  }
-
-  Widget _tile(IconData icon, String text) {
+  Widget _buildListTile(
+    IconData icon,
+    String title, {
+    required VoidCallback onTap,
+  }) {
     return ListTile(
-      leading: Icon(icon),
-      title: Text(text),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: () {},
-    );
-  }
-
-  Widget _dangerButton(String text) {
-    return OutlinedButton.icon(
-      onPressed: () {},
-      icon: const Icon(Icons.delete),
-      label: Text(text),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: Colors.grey[700],
-        minimumSize: const Size(double.infinity, 48),
-      ),
-    );
-  }
-
-  Widget _logoutButton() {
-    return ElevatedButton.icon(
-      onPressed: () {},
-      icon: const Icon(Icons.logout),
-      label: const Text("Log out"),
-      style: ElevatedButton.styleFrom(
-        minimumSize: const Size(double.infinity, 50),
-        backgroundColor: Colors.blue,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(30),
+      leading: Icon(icon, color: Colors.grey[600]),
+      title: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w500,
+          color: Colors.black87,
         ),
       ),
+      trailing: Icon(
+        Icons.arrow_forward_ios,
+        size: 16,
+        color: Colors.grey[400],
+      ),
+      onTap: onTap,
     );
   }
 }
