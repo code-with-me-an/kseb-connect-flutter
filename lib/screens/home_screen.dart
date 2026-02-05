@@ -1,15 +1,11 @@
 import 'package:flutter/material.dart';
 import 'report_complaint_screen.dart';
-import 'my_complaints_screen.dart';
-import 'nearby_complaints_screen.dart';
-import 'profile_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    const navyBlue = Color(0xFF0D3B66);
     const backgroundGrey = Color(0xFFF2F2F2);
     const orangeColor = Color(0xFFE85842); // For Report Button
 

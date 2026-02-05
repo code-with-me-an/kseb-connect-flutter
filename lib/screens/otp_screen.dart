@@ -4,7 +4,6 @@ import 'package:kseb_connect/screens/main_layout.dart';
 import 'package:pinput/pinput.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
-import 'home_screen.dart'; // Ensure this file exists and contains HomeScreen class
 
 class OtpScreen extends StatefulWidget {
   final String name;
@@ -123,7 +122,7 @@ class _OtpScreenState extends State<OtpScreen> {
         border: Border.all(color: Colors.transparent),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             spreadRadius: 1,
             blurRadius: 1,
           ),
