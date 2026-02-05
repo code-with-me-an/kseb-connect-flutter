@@ -66,7 +66,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const navyBlue = Color(0xFF0D3B66);
     const backgroundGrey = Color(0xFFF5F5F5);
 
     return Scaffold(
