@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart'; 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../main.dart';
 import 'otp_screen.dart';
 
@@ -205,8 +206,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Checkbox(
                         value: keepSignedIn,
                         activeColor: primaryColor,
-                        onChanged: (val) {
-                          setState(() => keepSignedIn = val ?? false);
+                        onChanged: (val) async {
+                          final newVal = val ?? false;
+                          setState(() => keepSignedIn = newVal);
+                          final prefs = await SharedPreferences.getInstance();
+                          await prefs.setBool('keepSignedIn', newVal);
                         },
                       ),
                     ),
