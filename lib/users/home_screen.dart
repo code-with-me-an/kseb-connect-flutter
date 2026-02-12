@@ -1,8 +1,44 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'report_complaint_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final supabase = Supabase.instance.client;
+
+  String userName = "User";
+  bool loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserName();
+  }
+
+  Future<void> _fetchUserName() async {
+    final user = supabase.auth.currentUser;
+
+    if (user == null) return;
+
+    final response = await supabase
+        .from('users')
+        .select('name')
+        .eq('id', user.id)
+        .maybeSingle();
+
+    if (response != null) {
+      setState(() {
+        userName = response['name'] ?? "User";
+        loading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +57,11 @@ class HomeScreen extends StatelessWidget {
             const Center(
               child: Text(
                 "Location: Westhill",
-                style: TextStyle(color: Colors.grey, fontSize: 14, fontWeight: FontWeight.w500),
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
             const SizedBox(height: 20),
@@ -34,7 +74,11 @@ class HomeScreen extends StatelessWidget {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4)),
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
                 ],
               ),
               child: Row(
@@ -43,19 +87,31 @@ class HomeScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          "Welcome, Adithyan 👋",
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
+                        loading
+                            ? const CircularProgressIndicator()
+                            : Text(
+                                "Welcome, $userName",
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+
                         const SizedBox(height: 8),
                         RichText(
                           text: const TextSpan(
                             text: "You have ",
-                            style: TextStyle(color: Colors.black54, fontSize: 14),
+                            style: TextStyle(
+                              color: Colors.black54,
+                              fontSize: 14,
+                            ),
                             children: [
                               TextSpan(
                                 text: "2 active complaints",
-                                style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                  color: Colors.green,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ],
                           ),
@@ -63,11 +119,19 @@ class HomeScreen extends StatelessWidget {
                         const SizedBox(height: 12),
                         Row(
                           children: [
-                            Icon(Icons.assignment_ind_outlined, size: 16, color: Colors.blue[700]),
+                            Icon(
+                              Icons.assignment_ind_outlined,
+                              size: 16,
+                              color: Colors.blue[700],
+                            ),
                             const SizedBox(width: 5),
                             Text(
                               "Last update: Officer assigned",
-                              style: TextStyle(fontSize: 12, color: Colors.blue[700], fontWeight: FontWeight.w500),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.blue[700],
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ],
                         ),
@@ -82,7 +146,11 @@ class HomeScreen extends StatelessWidget {
                     child: Image.network(
                       'https://cdn-icons-png.flaticon.com/512/3048/3048122.png', // Generic worker icon
                       fit: BoxFit.contain,
-                      errorBuilder: (c, o, s) => const Icon(Icons.engineering, size: 60, color: Colors.orange),
+                      errorBuilder: (c, o, s) => const Icon(
+                        Icons.engineering,
+                        size: 60,
+                        color: Colors.orange,
+                      ),
                     ),
                   ),
                 ],
@@ -98,7 +166,11 @@ class HomeScreen extends StatelessWidget {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4)),
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
                 ],
               ),
               child: Column(
@@ -115,8 +187,15 @@ class HomeScreen extends StatelessWidget {
                       _buildStep(true, "Reported", Colors.green),
                       _buildLine(true),
                       _buildStep(true, "Assigned", Colors.green),
-                      _buildLine(true, isHalf: true), // Half colored for "In Progress"
-                      _buildStep(true, "In Progress", Colors.blue), // Active step
+                      _buildLine(
+                        true,
+                        isHalf: true,
+                      ), // Half colored for "In Progress"
+                      _buildStep(
+                        true,
+                        "In Progress",
+                        Colors.blue,
+                      ), // Active step
                       _buildLine(false),
                       _buildStep(false, "Resolved", Colors.grey),
                     ],
@@ -130,12 +209,19 @@ class HomeScreen extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.info_outline, size: 16, color: Colors.grey),
+                        const Icon(
+                          Icons.info_outline,
+                          size: 16,
+                          color: Colors.grey,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             "Complaint #2515 | Power outage in your area",
-                            style: TextStyle(color: Colors.grey[700], fontSize: 12),
+                            style: TextStyle(
+                              color: Colors.grey[700],
+                              fontSize: 12,
+                            ),
                           ),
                         ),
                       ],
@@ -154,14 +240,18 @@ class HomeScreen extends StatelessWidget {
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: orangeColor,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
                   elevation: 5,
                   shadowColor: orangeColor.withOpacity(0.4),
                 ),
                 onPressed: () {
-                   Navigator.push(
+                  Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const ReportComplaintScreen()),
+                    MaterialPageRoute(
+                      builder: (_) => const ReportComplaintScreen(),
+                    ),
                   );
                 },
                 child: Row(
@@ -169,13 +259,20 @@ class HomeScreen extends StatelessWidget {
                   children: [
                     Container(
                       padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
                       child: Icon(Icons.favorite, color: orangeColor, size: 18),
                     ),
                     const SizedBox(width: 15),
                     const Text(
                       "Report Complaint",
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
                   ],
                 ),
@@ -196,7 +293,7 @@ class HomeScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 15),
-            
+
             // Alert 1 (Yellow)
             _buildAlertCard(
               color: const Color(0xFFFFF8E1), // Light Yellow
@@ -207,9 +304,9 @@ class HomeScreen extends StatelessWidget {
               badgeColor: Colors.orange[100]!,
               badgeTextColor: Colors.orange[800]!,
             ),
-            
+
             const SizedBox(height: 10),
-            
+
             // Alert 2 (Blue)
             _buildAlertCard(
               color: const Color(0xFFE3F2FD), // Light Blue
@@ -244,12 +341,20 @@ class HomeScreen extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  _buildIssueItem("Power outage on Sunset Ave", "1.2 km", isLast: false),
-                  _buildIssueItem("Transformer issue at Green St", "900 m", isLast: true),
+                  _buildIssueItem(
+                    "Power outage on Sunset Ave",
+                    "1.2 km",
+                    isLast: false,
+                  ),
+                  _buildIssueItem(
+                    "Transformer issue at Green St",
+                    "900 m",
+                    isLast: true,
+                  ),
                 ],
               ),
             ),
-             const SizedBox(height: 20),
+            const SizedBox(height: 20),
           ],
         ),
       ),
@@ -265,13 +370,19 @@ class HomeScreen extends StatelessWidget {
         CircleAvatar(
           radius: 8,
           backgroundColor: isActive ? color : Colors.grey[300],
-          child: isActive ? const Icon(Icons.check, size: 10, color: Colors.white) : null,
+          child: isActive
+              ? const Icon(Icons.check, size: 10, color: Colors.white)
+              : null,
         ),
         const SizedBox(height: 4),
         Text(
           label,
-          style: TextStyle(fontSize: 10, color: isActive ? Colors.black87 : Colors.grey, fontWeight: isActive ? FontWeight.bold : FontWeight.normal),
-        )
+          style: TextStyle(
+            fontSize: 10,
+            color: isActive ? Colors.black87 : Colors.grey,
+            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
       ],
     );
   }
@@ -319,7 +430,11 @@ class HomeScreen extends StatelessWidget {
               children: [
                 Text(
                   text,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
                 ),
               ],
             ),
@@ -332,9 +447,13 @@ class HomeScreen extends StatelessWidget {
             ),
             child: Text(
               badgeText,
-              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: badgeTextColor),
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: badgeTextColor,
+              ),
             ),
-          )
+          ),
         ],
       ),
     );
@@ -345,20 +464,35 @@ class HomeScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
       decoration: BoxDecoration(
-        border: isLast ? null : Border(bottom: BorderSide(color: Colors.grey.shade200)),
+        border: isLast
+            ? null
+            : Border(bottom: BorderSide(color: Colors.grey.shade200)),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(color: Colors.red[50], shape: BoxShape.circle),
-            child: const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 18),
+            decoration: BoxDecoration(
+              color: Colors.red[50],
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.warning_amber_rounded,
+              color: Colors.red,
+              size: 18,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(text, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+            ),
           ),
-          Text(distance, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+          Text(
+            distance,
+            style: const TextStyle(color: Colors.grey, fontSize: 12),
+          ),
         ],
       ),
     );

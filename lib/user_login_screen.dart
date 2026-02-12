@@ -1,7 +1,8 @@
 import 'package:flutter/gestures.dart'; 
 import 'package:flutter/material.dart';
+import 'package:kseb_connect/admin_login_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../main.dart';
+import 'main.dart';
 import 'otp_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -267,8 +268,13 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           recognizer: TapGestureRecognizer()
                             ..onTap = () {
-                              print("Sign up clicked");
-                            },
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const AdminLoginScreen(),
+      ),
+    );
+  },
                         ),
                       ],
                     ),

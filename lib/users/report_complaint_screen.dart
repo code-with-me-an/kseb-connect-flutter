@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
@@ -23,6 +24,39 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
   final MapController _mapController = MapController();
   LatLng? _selectedLocation;
   bool _isMapLoading = true;
+  bool submitting = false;
+
+  String generateTrackingCode() {
+    final random = Random();
+
+    // Generate 3 uppercase letters
+    String letters = String.fromCharCodes(
+      List.generate(3, (_) => random.nextInt(26) + 65),
+    );
+
+    // Generate 5 digit number (00000 - 99999)
+    String numbers = random.nextInt(100000).toString().padLeft(5, '0');
+
+    return letters + numbers;
+  }
+
+  Future<String> generateUniqueTrackingCode() async {
+    final supabase = Supabase.instance.client;
+
+    while (true) {
+      String code = generateTrackingCode();
+
+      final existing = await supabase
+          .from('complaints')
+          .select('tracking_code')
+          .eq('tracking_code', code)
+          .maybeSingle();
+
+      if (existing == null) {
+        return code;
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -59,14 +93,11 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
 
     setState(() {
       _isMapLoading = false;
-      // ✅ This puts the Red Pin on the Blue Dot immediately
+      //  This puts the Red Pin on the Blue Dot immediately
       _selectedLocation = LatLng(position.latitude, position.longitude);
     });
 
-    _mapController.move(
-      LatLng(position.latitude, position.longitude),
-      15.0,
-    );
+    _mapController.move(LatLng(position.latitude, position.longitude), 15.0);
   }
 
   // ... (Keep _pickImage, uploadImage, submitComplaint same as before) ...
@@ -86,7 +117,8 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
 
   Future<String?> uploadImage(File image) async {
     final supabase = Supabase.instance.client;
-    final fileName ='public/complaints/${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final fileName =
+        'public/complaints/${DateTime.now().millisecondsSinceEpoch}.jpg';
 
     await supabase.storage.from('complaint-images').upload(fileName, image);
     return supabase.storage.from('complaint-images').getPublicUrl(fileName);
@@ -96,6 +128,7 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
     required String complaintTypeUI,
     required String category,
     required String description,
+
     File? image,
     String? consumerId,
     double? latitude,
@@ -103,6 +136,7 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
   }) async {
     final supabase = Supabase.instance.client;
     final user = supabase.auth.currentUser;
+    String trackingCode = await generateUniqueTrackingCode();
 
     if (user == null) throw Exception("User not logged in");
 
@@ -116,21 +150,132 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
       throw Exception("Personal complaint requires consumer ID");
     }
 
-    if (complaintType == 'community' && (latitude == null || longitude == null)) {
+    if (complaintType == 'community' &&
+        (latitude == null || longitude == null)) {
       throw Exception("Please select a location on the map.");
     }
 
-    await supabase.from('complaints').insert({
-      'user_id': user.id,
-      'section_id': '50768a6c-9ef1-4424-aef5-11bc54b88411',
-      'complaint_type': complaintType,
-      'category': category,
-      'description': description,
-      'consumer_id': complaintType == 'personal' ? consumerId : null,
-      'latitude': complaintType == 'community' ? latitude : null,
-      'longitude': complaintType == 'community' ? longitude : null,
-      'image_url': imageUrl,
-    });
+    final response = await supabase
+        .from('complaints')
+        .insert({
+          'tracking_code': trackingCode,
+          'user_id': user.id,
+          'section_id': '50768a6c-9ef1-4424-aef5-11bc54b88411',
+          'complaint_type': complaintType,
+          'category': category,
+          'description': description,
+          'consumer_id': complaintType == 'personal' ? consumerId : null,
+          'latitude': complaintType == 'community' ? latitude : null,
+          'longitude': complaintType == 'community' ? longitude : null,
+          'image_url': imageUrl,
+        })
+        .select()
+        .single();
+    if (!mounted) return;
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Top Icon
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFE6EEF6),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_circle,
+                  color: Color(0xFF0D3B66),
+                  size: 40,
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Title
+              const Text(
+                "Complaint Registered",
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0D3B66),
+                ),
+                textAlign: TextAlign.center,
+              ),
+
+              const SizedBox(height: 15),
+
+              const Text(
+                "Your Tracking Code",
+                style: TextStyle(fontSize: 14, color: Colors.grey),
+              ),
+
+              const SizedBox(height: 8),
+
+              // Tracking Code Highlight
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 20,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F5F5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  response['tracking_code'],
+                  style: const TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2,
+                    color: Color(0xFF0D3B66),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 25),
+
+              // Button
+              SizedBox(
+                width: double.infinity,
+                height: 45,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0D3B66),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(context); // Close dialog
+                    Navigator.pop(context); // Go back screen
+                  },
+                  child: const Text(
+                    "OK",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -145,7 +290,11 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
         backgroundColor: navyBlue,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20, color: Colors.white),
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            size: 20,
+            color: Colors.white,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
@@ -163,8 +312,15 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
               hint: "Select Complaint Type",
               value: complaintType,
               items: [
-                'power_outage', 'voltage_issue', 'billing_issue', 'meter_issue',
-                'line_issue', 'transformer_issue', 'street_light', 'safety_hazard', 'etc',
+                'power_outage',
+                'voltage_issue',
+                'billing_issue',
+                'meter_issue',
+                'line_issue',
+                'transformer_issue',
+                'street_light',
+                'safety_hazard',
+                'etc',
               ],
               onChanged: (v) => setState(() => complaintType = v),
             ),
@@ -208,13 +364,19 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      _selectedImage != null ? Icons.check_circle : Icons.camera_alt_outlined,
-                      color: _selectedImage != null ? Colors.green : Colors.grey[700],
+                      _selectedImage != null
+                          ? Icons.check_circle
+                          : Icons.camera_alt_outlined,
+                      color: _selectedImage != null
+                          ? Colors.green
+                          : Colors.grey[700],
                       size: 28,
                     ),
                     const SizedBox(width: 10),
                     Text(
-                      _selectedImage != null ? "Image Captured" : "Upload Image",
+                      _selectedImage != null
+                          ? "Image Captured"
+                          : "Upload Image",
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -230,14 +392,19 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
                 padding: const EdgeInsets.only(top: 15),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: Image.file(_selectedImage!, height: 200, width: double.infinity, fit: BoxFit.cover),
+                  child: Image.file(
+                    _selectedImage!,
+                    height: 200,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
                 ),
               ),
             const SizedBox(height: 20),
 
             // --- REAL INTERACTIVE MAP ---
             Container(
-              height: 250, 
+              height: 250,
               width: double.infinity,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
@@ -262,17 +429,22 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
                             ),
                             children: [
                               TileLayer(
-                                urlTemplate: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+                                urlTemplate:
+                                    'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
                                 subdomains: const ['a', 'b', 'c'],
                                 userAgentPackageName: 'com.complaintapp.report',
                               ),
-                              
+
                               // 2. FIXED: Added the Blue Dot Layer here!
                               CurrentLocationLayer(
                                 style: const LocationMarkerStyle(
                                   marker: DefaultLocationMarker(
                                     color: Color(0xFF2196F3),
-                                    child: Icon(Icons.navigation, color: Colors.white, size: 14),
+                                    child: Icon(
+                                      Icons.navigation,
+                                      color: Colors.white,
+                                      size: 14,
+                                    ),
                                   ),
                                   markerSize: Size(20, 20),
                                   markerDirection: MarkerDirection.heading,
@@ -283,7 +455,7 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
                                 MarkerLayer(
                                   // 3. FIXED: Ensures marker stands UP on the location
                                   rotate: false,
-                                  alignment: Alignment.bottomCenter, 
+                                  alignment: Alignment.bottomCenter,
                                   markers: [
                                     Marker(
                                       point: _selectedLocation!,
@@ -299,7 +471,7 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
                                 ),
                             ],
                           ),
-                    
+
                     Positioned(
                       top: 10,
                       right: 10,
@@ -310,9 +482,15 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
                           decoration: const BoxDecoration(
                             color: Colors.white,
                             shape: BoxShape.circle,
-                            boxShadow: [BoxShadow(blurRadius: 5, color: Colors.black12)],
+                            boxShadow: [
+                              BoxShadow(blurRadius: 5, color: Colors.black12),
+                            ],
                           ),
-                          child: const Icon(Icons.my_location, size: 20, color: Color(0xFF0D3B66)),
+                          child: const Icon(
+                            Icons.my_location,
+                            size: 20,
+                            color: Color(0xFF0D3B66),
+                          ),
                         ),
                       ),
                     ),
@@ -320,7 +498,7 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
                 ),
               ),
             ),
-            
+
             if (_selectedLocation != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8.0, left: 4.0),
@@ -336,37 +514,68 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
               width: double.infinity,
               height: 55,
               child: ElevatedButton(
+                onPressed: submitting
+                    ? null
+                    : () async {
+                        if (complaintType == null ||
+                            category == null ||
+                            detailsController.text.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("Please fill all required fields"),
+                            ),
+                          );
+                          return;
+                        }
+
+                        setState(() => submitting = true);
+
+                        try {
+                          await submitComplaint(
+                            complaintTypeUI: category!,
+                            category: complaintType!,
+                            description: detailsController.text,
+                            image: _selectedImage,
+                            consumerId: category == "Personal"
+                                ? "<CONSUMER_ID_HERE>"
+                                : null,
+                            latitude: _selectedLocation?.latitude,
+                            longitude: _selectedLocation?.longitude,
+                          );
+                        } catch (e) {
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(SnackBar(content: Text(e.toString())));
+                        } finally {
+                          if (mounted) {
+                            setState(() => submitting = false);
+                          }
+                        }
+                      },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: navyBlue,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  backgroundColor: const Color(0xFF0D3B66),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                   elevation: 0,
                 ),
-                onPressed: () async {
-                  try {
-                    await submitComplaint(
-                      complaintTypeUI: category!,
-                      category: complaintType!,
-                      description: detailsController.text,
-                      image: _selectedImage,
-                      consumerId: category == "Personal" ? "<CONSUMER_ID_HERE>" : null,
-                      latitude: _selectedLocation?.latitude,
-                      longitude: _selectedLocation?.longitude,
-                    );
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Complaint submitted successfully")),
-                    );
-                    Navigator.pop(context);
-                  } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(e.toString())),
-                    );
-                  }
-                },
-                child: const Text(
-                  "Submit Complaint",
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                ),
+                child: submitting
+                    ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2.5,
+                        ),
+                      )
+                    : const Text(
+                        "Submit Complaint",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
               ),
             ),
           ],
@@ -394,20 +603,28 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
         child: DropdownButton<String>(
           value: value,
           isExpanded: true,
-          hint: Text(hint, style: const TextStyle(color: Colors.grey, fontSize: 15)),
+          hint: Text(
+            hint,
+            style: const TextStyle(color: Colors.grey, fontSize: 15),
+          ),
           icon: const Icon(Icons.keyboard_arrow_down, color: Colors.grey),
           dropdownColor: Colors.white,
           borderRadius: BorderRadius.circular(12),
           items: items.map((e) {
             String displayText = e.replaceAll('_', ' ');
             if (displayText.isNotEmpty) {
-              displayText = displayText[0].toUpperCase() + displayText.substring(1);
+              displayText =
+                  displayText[0].toUpperCase() + displayText.substring(1);
             }
             return DropdownMenuItem(
               value: e,
               child: Text(
                 displayText,
-                style: const TextStyle(fontSize: 15, color: Colors.black87, fontWeight: FontWeight.w500),
+                style: const TextStyle(
+                  fontSize: 15,
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             );
           }).toList(),

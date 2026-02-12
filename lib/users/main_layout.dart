@@ -158,7 +158,7 @@ class _MainLayoutState extends State<MainLayout> {
     const navyBlue = Color(0xFF0D3B66);
 
     return Scaffold(
-      // ✅ TOP BAR (single source of truth)
+      // TOP BAR (single source of truth)
       appBar: AppBar(
         backgroundColor: navyBlue,
         elevation: 0,
@@ -174,7 +174,7 @@ class _MainLayoutState extends State<MainLayout> {
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications_none, color: Colors.white),
-            // ✅ Trigger the notification dialog here
+            //  Trigger the notification dialog here
             onPressed: () => _showNotifications(context),
           ),
           const SizedBox(width: 8),

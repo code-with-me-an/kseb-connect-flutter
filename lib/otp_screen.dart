@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:kseb_connect/screens/main_layout.dart';
+import 'package:kseb_connect/users/main_layout.dart';
 import 'package:pinput/pinput.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../main.dart';
+import 'main.dart';
 
 class OtpScreen extends StatefulWidget {
   final String name;
