@@ -40,7 +40,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     }
   }
 
-  /// ✅ ADMIN LOGIN FUNCTION
+  /// ADMIN LOGIN FUNCTION
   Future<void> _handleAdminLogin() async {
     final username = usernameController.text.trim();
     final password = passwordController.text.trim();
@@ -150,7 +150,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                   child: Column(
                     children: [
                       Text(
-                        "Welcome",
+                        "Welcome Admin",
                         style: TextStyle(
                           fontSize: 40,
                           fontWeight: FontWeight.bold,

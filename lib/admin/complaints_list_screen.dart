@@ -43,6 +43,8 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
   Future<void> _fetchCommunityComplaints() async {
     if (officerSectionId == null) return;
 
+    setState(() => loading = true);
+
     final response = await supabase
         .from('complaints')
         .select()
@@ -172,12 +174,21 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
           // --- COMPLAINT LIST AREA ---
           Expanded(
             child: Container(
-              color: backgroundGrey, // Matches the active tab color
-              child: ListView(
-                padding: const EdgeInsets.all(20),
-                children: isCommunitySelected
-                    ? _buildCommunityList(adminThemeColor)
-                    : _buildPersonalList(adminThemeColor),
+              color: backgroundGrey,
+              child: RefreshIndicator(
+                color: const Color(0xFF219869),
+                onRefresh: () async {
+                  if (isCommunitySelected) {
+                    await _fetchCommunityComplaints();
+                  }
+                },
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(20),
+                  children: isCommunitySelected
+                      ? _buildCommunityList(adminThemeColor)
+                      : _buildPersonalList(adminThemeColor),
+                ),
               ),
             ),
           ),
@@ -187,33 +198,25 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
   }
 
   // --- 1. Community Complaints List ---
-List<Widget> _buildCommunityList(Color themeColor) {
+  List<Widget> _buildCommunityList(Color themeColor) {
+    if (loading) {
+      return [const Center(child: CircularProgressIndicator())];
+    }
 
-  if (loading) {
-    return [
-      const Center(child: CircularProgressIndicator())
-    ];
+    if (communityComplaints.isEmpty) {
+      return [const Center(child: Text("No complaints found"))];
+    }
+
+    return communityComplaints.map((complaint) {
+      return _buildComplaintCard(
+        title: "Tracking: ${complaint['tracking_code'] ?? ""}",
+        subtitle: "Issue: ${complaint['category'] ?? ""}",
+        detail: complaint['description'],
+        status: complaint['status'] ?? "Pending",
+        themeColor: themeColor,
+      );
+    }).toList();
   }
-
-  if (communityComplaints.isEmpty) {
-    return [
-      const Center(child: Text("No complaints found"))
-    ];
-  }
-
-  return communityComplaints.map((complaint) {
-
-    return _buildComplaintCard(
-      title: "Tracking: ${complaint['tracking_code'] ?? ""}",
-      subtitle: "Issue: ${complaint['category'] ?? ""}",
-      detail: complaint['description'],
-      status: complaint['status'] ?? "Pending",
-      themeColor: themeColor,
-    );
-
-  }).toList();
-}
-
 
   // --- 2. Personal Complaints List ---
   List<Widget> _buildPersonalList(Color themeColor) {

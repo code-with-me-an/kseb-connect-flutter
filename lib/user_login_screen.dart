@@ -109,9 +109,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Column(
                     children: [
                       Text(
-                        "Welcome",
+                        "Welcome Consumer",
                         style: TextStyle(
-                          fontSize: 40,
+                          fontSize: 34,
                           fontWeight: FontWeight.bold,
                           color: textColor,
                           fontFamily: 'Monospace',
