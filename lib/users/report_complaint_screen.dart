@@ -49,19 +49,33 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
   Future<String> generateUniqueTrackingCode() async {
     final supabase = Supabase.instance.client;
 
-    while (true) {
-      String code = generateTrackingCode();
+    int attempts = 0;
+    while (attempts < 10) {
+      try {
+        String code = generateTrackingCode();
 
-      final existing = await supabase
-          .from('complaints')
-          .select('tracking_code')
-          .eq('tracking_code', code)
-          .maybeSingle();
+        final existing = await supabase
+            .from('complaints')
+            .select('tracking_code')
+            .eq('tracking_code', code)
+            .maybeSingle();
 
-      if (existing == null) {
-        return code;
+        if (existing == null) {
+          return code;
+        }
+
+        attempts++;
+      } catch (e) {
+        debugPrint('Error generating tracking code: $e');
+        attempts++;
+
+        if (attempts >= 10) {
+          throw Exception('Failed to generate tracking code after 10 attempts');
+        }
       }
     }
+
+    throw Exception('Could not generate unique tracking code');
   }
 
   @override
@@ -77,7 +91,7 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
 
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      setState(() => _isMapLoading = false);
+      if (mounted) setState(() => _isMapLoading = false);
       return;
     }
 
@@ -85,23 +99,25 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
-        setState(() => _isMapLoading = false);
+        if (mounted) setState(() => _isMapLoading = false);
         return;
       }
     }
 
     if (permission == LocationPermission.deniedForever) {
-      setState(() => _isMapLoading = false);
+      if (mounted) setState(() => _isMapLoading = false);
       return;
     }
 
     Position position = await Geolocator.getCurrentPosition();
 
-    setState(() {
-      _isMapLoading = false;
-      //  This puts the Red Pin on the Blue Dot immediately
-      _selectedLocation = LatLng(position.latitude, position.longitude);
-    });
+    if (mounted) {
+      setState(() {
+        _isMapLoading = false;
+        //  This puts the Red Pin on the Blue Dot immediately
+        _selectedLocation = LatLng(position.latitude, position.longitude);
+      });
+    }
 
     _mapController.move(LatLng(position.latitude, position.longitude), 15.0);
   }
@@ -111,7 +127,7 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
     final ImagePicker picker = ImagePicker();
     try {
       final XFile? photo = await picker.pickImage(source: ImageSource.camera);
-      if (photo != null) {
+      if (photo != null && mounted) {
         setState(() {
           _selectedImage = File(photo.path);
         });
@@ -126,8 +142,14 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
     final fileName =
         'public/complaints/${DateTime.now().millisecondsSinceEpoch}.jpg';
 
-    await supabase.storage.from('complaint-images').upload(fileName, image);
-    return supabase.storage.from('complaint-images').getPublicUrl(fileName);
+    try {
+      await supabase.storage.from('complaint-images').upload(fileName, image);
+      final url = supabase.storage.from('complaint-images').getPublicUrl(fileName);
+      return url;
+    } catch (e) {
+      debugPrint('Error uploading image: $e');
+      return null;
+    }
   }
 
   Future<void> submitComplaint({
@@ -161,145 +183,220 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
       throw Exception("Please select a location on the map.");
     }
 
-    final response = await supabase
-        .from('complaints')
-        .insert({
-          'tracking_code': trackingCode,
-          'user_id': user.id,
-          'section_id': complaintType == 'personal'
-    ? _selectedSectionId
-    : _selectedSectionId ?? '50768a6c-9ef1-4424-aef5-11bc54b88411',
+    // ✅ ADD THIS: Require section for all complaints
+    if (_selectedSectionId == null || _selectedSectionId!.isEmpty) {
+      throw Exception("Please select a section for the complaint");
+    }
 
-          'complaint_type': complaintType,
-          'category': category,
-          'description': description,
-          'consumer_id': complaintType == 'personal' ? consumerId : null,
-          'latitude': latitude, //location for personal also
-          'longitude':longitude,
-          'image_url': imageUrl,
-        })
-        .select()
-        .single();
-    if (!mounted) return;
+    try {
+      final response = await supabase
+          .from('complaints')
+          .insert({
+            'tracking_code': trackingCode,
+            'user_id': user.id,
+            'section_id': _selectedSectionId,
+            'complaint_type': complaintType,
+            'category': category,
+            'description': description,
+            'consumer_id': complaintType == 'personal' ? consumerId : null,
+            'latitude': latitude,
+            'longitude': longitude,
+            'image_url': imageUrl,
+          })
+          .select()
+          .single();
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    showDialog(
-      context: context,
-      builder: (_) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Top Icon
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFE6EEF6),
-                  shape: BoxShape.circle,
+      showDialog(
+        context: context,
+        builder: (_) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Top Icon
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFE6EEF6),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check_circle,
+                    color: Color(0xFF0D3B66),
+                    size: 40,
+                  ),
                 ),
-                child: const Icon(
-                  Icons.check_circle,
-                  color: Color(0xFF0D3B66),
-                  size: 40,
-                ),
-              ),
 
-              const SizedBox(height: 20),
+                const SizedBox(height: 20),
 
-              // Title
-              const Text(
-                "Complaint Registered",
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF0D3B66),
-                ),
-                textAlign: TextAlign.center,
-              ),
-
-              const SizedBox(height: 15),
-
-              const Text(
-                "Your Tracking Code",
-                style: TextStyle(fontSize: 14, color: Colors.grey),
-              ),
-
-              const SizedBox(height: 8),
-
-              // Tracking Code Highlight
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 20,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF5F5F5),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  response['tracking_code'],
-                  style: const TextStyle(
-                    fontSize: 26,
+                // Title
+                const Text(
+                  "Complaint Registered",
+                  style: TextStyle(
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    letterSpacing: 2,
                     color: Color(0xFF0D3B66),
                   ),
+                  textAlign: TextAlign.center,
                 ),
-              ),
 
-              const SizedBox(height: 25),
+                const SizedBox(height: 15),
 
-              // Button
-              SizedBox(
-                width: double.infinity,
-                height: 45,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0D3B66),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
+                const Text(
+                  "Your Tracking Code",
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                ),
+
+                const SizedBox(height: 8),
+
+                // Tracking Code Highlight
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 12,
+                    horizontal: 20,
                   ),
-                  onPressed: () {
-                    Navigator.pop(context); // Close dialog
-                    Navigator.pop(context); // Go back screen
-                  },
-                  child: const Text(
-                    "OK",
-                    style: TextStyle(
-                      color: Colors.white,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF5F5F5),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    response['tracking_code'],
+                    style: const TextStyle(
+                      fontSize: 26,
                       fontWeight: FontWeight.bold,
+                      letterSpacing: 2,
+                      color: Color(0xFF0D3B66),
                     ),
                   ),
                 ),
-              ),
-            ],
+
+                const SizedBox(height: 25),
+
+                // Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 45,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0D3B66),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      Navigator.pop(context);
+                    },
+                    child: const Text(
+                      "OK",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      debugPrint('Error submitting complaint: $e');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to submit complaint: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 Future<void> fetchConsumerConnections() async {
   final user = supabase.auth.currentUser;
 
   if (user == null) return;
 
-  final response = await supabase
-      .from('consumer_connections')
-      .select()
-      .eq('user_id', user.id);
+  try {
+    final response = await supabase
+        .from('consumer_connections')
+        .select()
+        .eq('user_id', user.id);
 
-  setState(() {
-    _consumerConnections = response;
-  });
+    if (mounted) {
+      setState(() {
+        _consumerConnections = response;
+      });
+    }
+  } catch (e) {
+    debugPrint('Error fetching consumer connections: $e');
+    if (mounted) {
+      setState(() {
+        _consumerConnections = [];
+      });
+    }
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error loading connections: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 }
+
+  // ✅ NEW METHOD: Get user's default section for community complaints
+  Future<void> _fetchUserDefaultSection() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final connections = await supabase
+          .from('consumer_connections')
+          .select('section_id')
+          .eq('user_id', user.id)
+          .limit(1);
+
+      if (connections.isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            _selectedSectionId = connections[0]['section_id'].toString();
+          });
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No section found. Please add a consumer connection.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching default section: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -343,17 +440,23 @@ _buildCustomDropdown(
     {"value": "Community", "label": "Community"},
   ],
   onChanged: (v) async {
-    setState(() {
-      category = v;
+    if (mounted) {
+      setState(() {
+        category = v;
 
-      // 🔥 IMPROVEMENT 2: Reset dependent fields when switching category
-      _selectedConsumerId = null;
-      _selectedSectionId = null;
-    });
+        // ✅ CHANGED: Reset section only for Personal
+        if (v == "Personal") {
+          _selectedSectionId = null;
+        }
+        _selectedConsumerId = null;
+      });
+    }
 
-    // 🔥 IMPROVEMENT 3: Fetch consumer connections only for Personal
+    // ✅ CHANGED: Fetch connections for Personal, section for Community
     if (v == "Personal") {
       await fetchConsumerConnections();
+    } else if (v == "Community") {
+      await _fetchUserDefaultSection();
     }
   },
 ),
@@ -377,7 +480,9 @@ _buildCustomDropdown(
         "value": e,
         "label": e.replaceAll('_', ' ').toUpperCase(),
       }).toList(),
-  onChanged: (v) => setState(() => complaintType = v),
+  onChanged: (v) {
+    if (mounted) setState(() => complaintType = v);
+  },
 ),
 
             const SizedBox(height: 15),
@@ -399,10 +504,12 @@ if (category == "Personal" && _consumerConnections.isNotEmpty)
       final selected = _consumerConnections
           .firstWhere((e) => e['consumer_id'].toString() == val);
 
-      setState(() {
-        _selectedConsumerId = selected['consumer_id'].toString();
-        _selectedSectionId = selected['section_id'].toString();
-      });
+      if (mounted) {
+        setState(() {
+          _selectedConsumerId = selected['consumer_id'].toString();
+          _selectedSectionId = selected['section_id'].toString();
+        });
+      }
     },
   ),
 
@@ -500,9 +607,11 @@ if (category == "Personal" && _consumerConnections.isNotEmpty)
                               initialCenter: const LatLng(11.2588, 75.7804),
                               initialZoom: 15.0,
                               onTap: (_, latlng) {
-                                setState(() {
-                                  _selectedLocation = latlng;
-                                });
+                                if (mounted) {
+                                  setState(() {
+                                    _selectedLocation = latlng;
+                                  });
+                                }
                               },
                             ),
                             children: [
@@ -612,7 +721,7 @@ if (category == "Personal" && _consumerConnections.isNotEmpty)
   return;
 }
 
-                        setState(() => submitting = true);
+                        if (mounted) setState(() => submitting = true);
 
                         try {
                           await submitComplaint(

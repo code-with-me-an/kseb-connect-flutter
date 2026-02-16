@@ -70,12 +70,23 @@ class _OtpScreenState extends State<OtpScreen> {
       final user = response.user;
       if (user == null) throw 'User is null';
 
-      await supabase.from('users').upsert({
-        'id': user.id,
-        'name': widget.name,
-        'mobile_number': widget.phone,
-        'last_login_at': DateTime.now().toIso8601String(),
-      });
+      try {
+        await supabase.from('users').upsert({
+          'id': user.id,
+          'name': widget.name,
+          'mobile_number': widget.phone,
+          'last_login_at': DateTime.now().toIso8601String(),
+        });
+      } catch (upsertError) {
+        debugPrint('Failed to create user profile: $upsertError');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error creating profile: $upsertError')),
+          );
+        }
+        if (mounted) setState(() => verifying = false);
+        return;
+      }
 
       if (mounted) {
         Navigator.pushAndRemoveUntil(

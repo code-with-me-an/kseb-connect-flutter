@@ -34,30 +34,45 @@ class _AdminSectionMapScreenState extends State<AdminSectionMapScreen> {
 
       if (sectionId == null) {
         print("No section ID found");
+        if (mounted) setState(() => _loading = false);
         return;
       }
 
-      final response = await supabase
-          .from('complaints')
-          .select()
-          .eq('section_id', sectionId);
+      try {
+        final response = await supabase
+            .from('complaints')
+            .select()
+            .eq('section_id', sectionId);
 
-      setState(() {
-        _complaints = response;
-        _loading = false;
-      });
+        if (mounted) {
+          setState(() {
+            _complaints = response;
+            _loading = false;
+          });
+        }
 
-      print("Complaints fetched: ${_complaints.length}");
-
+        print("Complaints fetched: ${_complaints.length}");
+      } catch (queryError) {
+        print("Error fetching complaints: $queryError");
+        if (mounted) {
+          setState(() {
+            _complaints = [];
+            _loading = false;
+          });
+        }
+      }
     } catch (e) {
-      print("Error fetching complaints: $e");
+      print("Initialization error: $e");
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : Stack(
         children: [
 
           FlutterMap(

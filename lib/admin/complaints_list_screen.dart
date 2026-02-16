@@ -25,54 +25,98 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
 
     if (adminId == null) return;
 
-    final officer = await supabase
-        .from('officers')
-        .select('section_id')
-        .eq('officer_id', adminId)
-        .maybeSingle();
+    try {
+      final officer = await supabase
+          .from('officers')
+          .select('section_id')
+          .eq('officer_id', adminId)
+          .maybeSingle();
 
-    if (officer == null) return;
+      if (officer == null) {
+        print("Officer record not found");
+        return;
+      }
 
-    officerSectionId = officer['section_id'];
+      officerSectionId = officer['section_id'];
 
-    await _fetchCommunityComplaints();
+      await _fetchCommunityComplaints();
 
-    _listenToRealtime();
+      _listenToRealtime();
+    } catch (e) {
+      print("Error initializing: $e");
+
+      if (mounted) setState(() => loading = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error loading admin data: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Future<void> _fetchCommunityComplaints() async {
     if (officerSectionId == null) return;
 
-    setState(() => loading = true);
+    if (mounted) setState(() => loading = true);
 
-    final response = await supabase
-        .from('complaints')
-        .select()
-        .eq('section_id', officerSectionId!)
-        .eq('complaint_type', 'community')
-        .order('created_at', ascending: false);
+    try {
+      final response = await supabase
+          .from('complaints')
+          .select()
+          .eq('section_id', officerSectionId!)
+          .eq('complaint_type', 'community')
+          .order('created_at', ascending: false);
 
-    setState(() {
-      communityComplaints = List<Map<String, dynamic>>.from(response);
-      loading = false;
-    });
+      if (mounted) {
+        setState(() {
+          communityComplaints = List<Map<String, dynamic>>.from(response);
+          loading = false;
+        });
+      }
+    } catch (e) {
+      print("Error fetching community complaints: $e");
+
+      if (mounted) {
+        setState(() {
+          communityComplaints = [];
+          loading = false;
+        });
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error loading complaints: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   void _listenToRealtime() {
-    supabase
-        .channel('complaints-channel')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'complaints',
-          callback: (payload) {
-            if (payload.newRecord['section_id'] == officerSectionId &&
-                payload.newRecord['complaint_type'] == 'community') {
-              _fetchCommunityComplaints();
-            }
-          },
-        )
-        .subscribe();
+    try {
+      supabase
+          .channel('complaints-channel')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'complaints',
+            callback: (payload) {
+              try {
+                if (payload.newRecord['section_id'] == officerSectionId &&
+                    payload.newRecord['complaint_type'] == 'community') {
+                  _fetchCommunityComplaints();
+                }
+              } catch (e) {
+                print("Error in realtime callback: $e");
+              }
+            },
+          )
+          .subscribe();
+    } catch (e) {
+      print("Error setting up realtime listener: $e");
+    }
   }
 
   final supabase = Supabase.instance.client;

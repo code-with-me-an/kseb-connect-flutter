@@ -34,15 +34,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       final createdAt = DateTime.parse(data['created_at']);
 
-      setState(() {
-        userName = data['name'];
-        phoneNumber = data['mobile_number'];
-        joinDate = "${_monthName(createdAt.month)}-${createdAt.year}";
-        loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          userName = data['name'];
+          phoneNumber = data['mobile_number'];
+          joinDate = "${_monthName(createdAt.month)}-${createdAt.year}";
+          loading = false;
+        });
+      }
     } catch (e) {
       debugPrint("Profile fetch error: $e");
-      setState(() => loading = false);
+      if (mounted) setState(() => loading = false);
     }
   }
 
