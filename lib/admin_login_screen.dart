@@ -66,11 +66,11 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
       if (response != null) {
         final prefs = await SharedPreferences.getInstance();
 
-        if (keepSignedIn) {
-          await prefs.setBool('admin_logged_in', true);
-          await prefs.setString('admin_id', response['officer_id']);
-          await prefs.setString('admin_username', response['username']);
-        }
+     await prefs.setBool('admin_logged_in', true);
+await prefs.setString('admin_id', response['officer_id']);
+await prefs.setString('admin_username', response['username']);
+await prefs.setString('admin_section_id', response['section_id']);
+
 
         if (!mounted) return;
 

@@ -17,6 +17,12 @@ class ReportComplaintScreen extends StatefulWidget {
 }
 
 class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
+    final supabase = Supabase.instance.client;
+
+  List<dynamic> _consumerConnections = [];
+  String? _selectedConsumerId;
+  String? _selectedSectionId;
+
   String? complaintType;
   String? category;
   final TextEditingController detailsController = TextEditingController();
@@ -160,13 +166,16 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
         .insert({
           'tracking_code': trackingCode,
           'user_id': user.id,
-          'section_id': '50768a6c-9ef1-4424-aef5-11bc54b88411',
+          'section_id': complaintType == 'personal'
+    ? _selectedSectionId
+    : _selectedSectionId ?? '50768a6c-9ef1-4424-aef5-11bc54b88411',
+
           'complaint_type': complaintType,
           'category': category,
           'description': description,
           'consumer_id': complaintType == 'personal' ? consumerId : null,
-          'latitude': complaintType == 'community' ? latitude : null,
-          'longitude': complaintType == 'community' ? longitude : null,
+          'latitude': latitude, //location for personal also
+          'longitude':longitude,
           'image_url': imageUrl,
         })
         .select()
@@ -277,6 +286,20 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
       ),
     );
   }
+Future<void> fetchConsumerConnections() async {
+  final user = supabase.auth.currentUser;
+
+  if (user == null) return;
+
+  final response = await supabase
+      .from('consumer_connections')
+      .select()
+      .eq('user_id', user.id);
+
+  setState(() {
+    _consumerConnections = response;
+  });
+}
 
   @override
   Widget build(BuildContext context) {
@@ -308,29 +331,84 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildCustomDropdown(
-              hint: "Select Complaint Type",
-              value: complaintType,
-              items: [
-                'power_outage',
-                'voltage_issue',
-                'billing_issue',
-                'meter_issue',
-                'line_issue',
-                'transformer_issue',
-                'street_light',
-                'safety_hazard',
-                'etc',
-              ],
-              onChanged: (v) => setState(() => complaintType = v),
-            ),
+            // ======================
+// 🔥 IMPROVEMENT 1: Added Category Dropdown (Personal / Community)
+// ======================
+
+_buildCustomDropdown(
+  hint: "Select Category",
+  value: category,
+  items: const [
+    {"value": "Personal", "label": "Personal"},
+    {"value": "Community", "label": "Community"},
+  ],
+  onChanged: (v) async {
+    setState(() {
+      category = v;
+
+      // 🔥 IMPROVEMENT 2: Reset dependent fields when switching category
+      _selectedConsumerId = null;
+      _selectedSectionId = null;
+    });
+
+    // 🔥 IMPROVEMENT 3: Fetch consumer connections only for Personal
+    if (v == "Personal") {
+      await fetchConsumerConnections();
+    }
+  },
+),
+
+const SizedBox(height: 15),
+// 🔥 IMPROVEMENT 4: Proper dropdown map structure (prevents assertion error)
+_buildCustomDropdown(
+  hint: "Select Complaint Type",
+  value: complaintType,
+  items: [
+    'power_outage',
+    'voltage_issue',
+    'billing_issue',
+    'meter_issue',
+    'line_issue',
+    'transformer_issue',
+    'street_light',
+    'safety_hazard',
+    'etc',
+  ].map((e) => {
+        "value": e,
+        "label": e.replaceAll('_', ' ').toUpperCase(),
+      }).toList(),
+  onChanged: (v) => setState(() => complaintType = v),
+),
+
             const SizedBox(height: 15),
-            _buildCustomDropdown(
-              hint: "Category",
-              value: category,
-              items: ["Personal", "Community"],
-              onChanged: (v) => setState(() => category = v),
-            ),
+// ======================
+// 🔥 IMPROVEMENT 5: Show Consumer Dropdown ONLY if Personal
+// ======================
+
+if (category == "Personal" && _consumerConnections.isNotEmpty)
+  _buildCustomDropdown(
+    hint: "Select Consumer Number",
+    value: _selectedConsumerId,
+    items: _consumerConnections.map<Map<String, String>>((e) {
+      return {
+        "value": e['consumer_id'].toString(),
+        "label": e['consumer_number'].toString(),
+      };
+    }).toList(),
+    onChanged: (val) {
+      final selected = _consumerConnections
+          .firstWhere((e) => e['consumer_id'].toString() == val);
+
+      setState(() {
+        _selectedConsumerId = selected['consumer_id'].toString();
+        _selectedSectionId = selected['section_id'].toString();
+      });
+    },
+  ),
+
+
+
+
             const SizedBox(height: 15),
             Container(
               decoration: BoxDecoration(
@@ -527,6 +605,12 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
                           );
                           return;
                         }
+                      if (category == "Personal" && _selectedConsumerId == null) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text("Please select consumer number")),
+  );
+  return;
+}
 
                         setState(() => submitting = true);
 
@@ -537,7 +621,7 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
                             description: detailsController.text,
                             image: _selectedImage,
                             consumerId: category == "Personal"
-                                ? "<CONSUMER_ID_HERE>"
+                                ? _selectedConsumerId
                                 : null,
                             latitude: _selectedLocation?.latitude,
                             longitude: _selectedLocation?.longitude,
@@ -585,10 +669,10 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
   }
 
   Widget _buildCustomDropdown({
-    required String hint,
-    required String? value,
-    required List<String> items,
-    required Function(String?) onChanged,
+     required String hint,
+  required String? value,
+  required List<Map<String, String>> items,
+  required Function(String?) onChanged,
   }) {
     return Container(
       width: double.infinity,
@@ -610,24 +694,20 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
           icon: const Icon(Icons.keyboard_arrow_down, color: Colors.grey),
           dropdownColor: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          items: items.map((e) {
-            String displayText = e.replaceAll('_', ' ');
-            if (displayText.isNotEmpty) {
-              displayText =
-                  displayText[0].toUpperCase() + displayText.substring(1);
-            }
-            return DropdownMenuItem(
-              value: e,
-              child: Text(
-                displayText,
-                style: const TextStyle(
-                  fontSize: 15,
-                  color: Colors.black87,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            );
-          }).toList(),
+         items: items.map((item) {
+  return DropdownMenuItem<String>(
+    value: item['value'],
+    child: Text(
+      item['label']!,
+      style: const TextStyle(
+        fontSize: 15,
+        color: Colors.black87,
+        fontWeight: FontWeight.w500,
+      ),
+    ),
+  );
+}).toList(),
+
           onChanged: onChanged,
         ),
       ),
