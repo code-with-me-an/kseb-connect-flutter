@@ -30,10 +30,8 @@ class _AdminSectionMapScreenState extends State<AdminSectionMapScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final sectionId = prefs.getString('admin_section_id');
-      print("Section ID from prefs: $sectionId");
 
       if (sectionId == null) {
-        print("No section ID found");
         if (mounted) setState(() => _loading = false);
         return;
       }
@@ -50,10 +48,7 @@ class _AdminSectionMapScreenState extends State<AdminSectionMapScreen> {
             _loading = false;
           });
         }
-
-        print("Complaints fetched: ${_complaints.length}");
       } catch (queryError) {
-        print("Error fetching complaints: $queryError");
         if (mounted) {
           setState(() {
             _complaints = [];
@@ -62,7 +57,6 @@ class _AdminSectionMapScreenState extends State<AdminSectionMapScreen> {
         }
       }
     } catch (e) {
-      print("Initialization error: $e");
       if (mounted) setState(() => _loading = false);
     }
   }
@@ -94,7 +88,6 @@ class _AdminSectionMapScreenState extends State<AdminSectionMapScreen> {
       final lat = complaint['latitude'];
       final lng = complaint['longitude'];
       final type = complaint['complaint_type'];
-print("Complaint type: $type");
 
       if (lat == null || lng == null) {
         return null;

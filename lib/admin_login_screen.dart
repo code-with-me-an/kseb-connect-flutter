@@ -80,6 +80,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
           ),
         );
       } else {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("Invalid username or password"),
@@ -98,6 +99,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         errorMessage = 'Error: $e';
       }
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(errorMessage),

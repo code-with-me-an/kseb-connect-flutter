@@ -33,7 +33,6 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
           .maybeSingle();
 
       if (officer == null) {
-        print("Officer record not found");
         return;
       }
 
@@ -43,10 +42,11 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
 
       _listenToRealtime();
     } catch (e) {
-      print("Error initializing: $e");
+      if (mounted) {
+        setState(() => loading = false);
+      }
 
-      if (mounted) setState(() => loading = false);
-
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error loading admin data: $e'),
@@ -76,8 +76,6 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
         });
       }
     } catch (e) {
-      print("Error fetching community complaints: $e");
-
       if (mounted) {
         setState(() {
           communityComplaints = [];
@@ -85,6 +83,7 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
         });
       }
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error loading complaints: $e'),
@@ -109,15 +108,15 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
                   _fetchCommunityComplaints();
                 }
               } catch (e) {
-                print("Error in realtime callback: $e");
+                // Handle error silently
               }
             },
           )
           .subscribe();
     } catch (e) {
-      print("Error setting up realtime listener: $e");
-    }
+      // Handle error silently
   }
+}
 
   final supabase = Supabase.instance.client;
 
@@ -312,7 +311,7 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
