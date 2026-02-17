@@ -21,21 +21,43 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
   }
 
   Future<void> fetchComplaints() async {
-    setState(() => loading = true);
+    if (mounted) setState(() => loading = true);
 
     final user = supabase.auth.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      if (mounted) setState(() => loading = false);
+      return;
+    }
 
-    final response = await supabase
-        .from('complaints')
-        .select()
-        .eq('user_id', user.id)
-        .order('created_at', ascending: false);
+    try {
+      final response = await supabase
+          .from('complaints')
+          .select()
+          .eq('user_id', user.id)
+          .order('created_at', ascending: false);
 
-    setState(() {
-      complaints = List<Map<String, dynamic>>.from(response);
-      loading = false;
-    });
+      if (mounted) {
+        setState(() {
+          complaints = List<Map<String, dynamic>>.from(response);
+          loading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching complaints: $e');
+      if (mounted) {
+        setState(() {
+          complaints = [];
+          loading = false;
+        });
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to load complaints: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override

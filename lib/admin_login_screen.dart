@@ -52,7 +52,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
       return;
     }
 
-    setState(() => loading = true);
+    if (mounted) setState(() => loading = true);
 
     try {
       final response = await supabase
@@ -66,11 +66,10 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
       if (response != null) {
         final prefs = await SharedPreferences.getInstance();
 
-        if (keepSignedIn) {
-          await prefs.setBool('admin_logged_in', true);
-          await prefs.setString('admin_id', response['officer_id']);
-          await prefs.setString('admin_username', response['username']);
-        }
+        await prefs.setBool('admin_logged_in', true);
+        await prefs.setString('admin_id', response['officer_id']);
+        await prefs.setString('admin_username', response['username']);
+        await prefs.setString('admin_section_id', response['section_id']);
 
         if (!mounted) return;
 
@@ -81,6 +80,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
           ),
         );
       } else {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("Invalid username or password"),
@@ -89,8 +89,22 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         );
       }
     } catch (e) {
+      String errorMessage = 'Login failed';
+
+      if (e.toString().contains('permission')) {
+        errorMessage = 'Permission denied - Please check RLS policies';
+      } else if (e.toString().contains('connection')) {
+        errorMessage = 'Network error - Please check your internet';
+      } else {
+        errorMessage = 'Error: $e';
+      }
+
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Login Error: $e")),
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.red,
+        ),
       );
     } finally {
       if (mounted) {

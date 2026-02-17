@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:kseb_connect/admin/admin_profile_screen.dart';
 import 'package:kseb_connect/admin/complaints_list_screen.dart';
 import 'admin_dashboard.dart';
+import 'package:kseb_connect/admin/admin_section_map_screen.dart';
+
 
 
 class AdminLayout extends StatefulWidget {
@@ -18,7 +20,7 @@ class _AdminLayoutState extends State<AdminLayout> {
   final List<Widget> _screens = const [
     AdminDashboard(), // The dashboard we just made
     ComplaintsListScreen(),
-    Center(child: Text("Map View (Coming Soon)")),
+    AdminSectionMapScreen(),
     AdminProfileScreen(),
   ];
 

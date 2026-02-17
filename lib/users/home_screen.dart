@@ -24,19 +24,45 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _fetchUserName() async {
     final user = supabase.auth.currentUser;
 
-    if (user == null) return;
+    if (user == null) {
+      if (mounted) setState(() => loading = false);
+      return;
+    }
 
-    final response = await supabase
-        .from('users')
-        .select('name')
-        .eq('id', user.id)
-        .maybeSingle();
+    try {
+      final response = await supabase
+          .from('users')
+          .select('name')
+          .eq('id', user.id)
+          .maybeSingle();
 
-    if (response != null) {
-      setState(() {
-        userName = response['name'] ?? "User";
-        loading = false;
-      });
+      if (response != null) {
+        if (mounted) {
+          setState(() {
+            userName = response['name'] ?? "User";
+            loading = false;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            userName = "User";
+            loading = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching user name: $e');
+      if (mounted) {
+        setState(() {
+          userName = "User";
+          loading = false;
+        });
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading profile: $e')),
+      );
     }
   }
 

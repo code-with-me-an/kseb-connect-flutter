@@ -28,7 +28,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     final adminId = prefs.getString('admin_id');
 
     if (adminId == null) {
-      setState(() => loading = false);
+      if (mounted) setState(() => loading = false);
       return;
     }
 
@@ -39,12 +39,14 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
         .maybeSingle();
 
     if (response != null) {
-      setState(() {
-        adminData = response;
-        loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          adminData = response;
+          loading = false;
+        });
+      }
     } else {
-      setState(() => loading = false);
+      if (mounted) setState(() => loading = false);
     }
   }
 
