@@ -107,6 +107,58 @@ Notes:
 flutter run -d <deviceId>
 ```
 
+### Git: common repository commands
+
+Use these commands for typical workflows: creating branches, pushing, merging, resolving conflicts, and undoing changes.
+
+```bash
+# Create and switch to a new branch
+git checkout -b feature/<name>
+
+# Stage and commit changes
+git add .
+git commit -m "Short, clear message"
+
+# Push branch to remote and set upstream
+git push -u origin feature/<name>
+
+# Update local main and rebase or merge into your branch
+git fetch origin
+git checkout main
+git pull origin main
+git checkout feature/<name>
+git rebase origin/main   # or `git merge origin/main`
+
+# Merge a feature branch into main (locally)
+git checkout main
+git merge --no-ff feature/<name>
+git push origin main
+
+# Resolve merge conflicts: edit files, then
+git add <file>
+git commit
+
+# Undo changes (working tree)
+git restore <file>            # discard changes in working dir
+git restore --staged <file>   # unstage
+
+# Undo last commit but keep changes staged
+git reset --soft HEAD~1
+
+# Undo last commit and discard changes
+git reset --hard HEAD~1
+
+# Revert a pushed commit (creates a new commit)
+git revert <commit-hash>
+
+# Recover lost commits (use reflog)
+git reflog
+git checkout -b recover/<name> <commit-hash>
+
+# Re-apply a commit (cherry-pick)
+git cherry-pick <commit-hash>
+```
+
 ## Contribution & Next Steps
 
 - Implement tests and CI for builds.
