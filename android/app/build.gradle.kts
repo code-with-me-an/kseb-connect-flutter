@@ -9,6 +9,7 @@ android {
     namespace = "com.example.kseb_connect"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
+    buildToolsVersion = "33.0.0"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

@@ -4,154 +4,137 @@ import 'package:latlong2/latlong.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
 import 'package:geolocator/geolocator.dart';
-import '../main.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class NearByComplaintsScreen extends StatefulWidget {
   const NearByComplaintsScreen({super.key});
 
   @override
-  State<NearByComplaintsScreen> createState() => _NearByComplaintsScreenState();
+  State<NearByComplaintsScreen> createState() =>
+      _NearByComplaintsScreenState();
 }
 
-class _NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
+class _NearByComplaintsScreenState
+    extends State<NearByComplaintsScreen> {
   final Color navyBlue = const Color(0xFF0D3B66);
   int? _selectedMarkerIndex;
   final MapController _mapController = MapController();
 
   List<Map<String, dynamic>> _complaints = [];
-  bool _loading = true;
-  String? _userSectionId;
+  bool _isLoadingComplaints = true;
 
   @override
   void initState() {
     super.initState();
-    _initializeAndFetch();
+    _fetchNearbyComplaints();
   }
 
-  Future<void> _initializeAndFetch() async {
-    try {
-      final user = supabase.auth.currentUser;
-      if (user == null) {
-        if (mounted) setState(() => _loading = false);
-        return;
-      }
-
-      final connections = await supabase
-          .from('consumer_connections')
-          .select('section_id')
-          .eq('user_id', user.id)
-          .limit(1);
-
-      if (connections.isNotEmpty) {
-        _userSectionId = connections[0]['section_id'];
-        await _fetchNearbyComplaints();
-      } else {
-        if (mounted) setState(() => _loading = false);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('No section found for your consumer'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint('Error initializing: $e');
-      if (mounted) setState(() => _loading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
+  // ================= FETCH COMMUNITY COMPLAINTS =================
 
   Future<void> _fetchNearbyComplaints() async {
-    if (_userSectionId == null) return;
+    final supabase = Supabase.instance.client;
 
     try {
       final response = await supabase
           .from('complaints')
-          .select()
+          .select('''
+            complaint_id,
+            category,
+            description,
+            latitude,
+            longitude,
+            upvotes(count)
+          ''')
           .eq('complaint_type', 'community')
-          .eq('section_id', _userSectionId!)
-          .order('created_at', ascending: false);
+          .not('latitude', 'is', null)
+          .not('longitude', 'is', null);
 
-      if (mounted) {
-        setState(() {
-          _complaints = List<Map<String, dynamic>>.from(response);
-          _loading = false;
-        });
-      }
+      setState(() {
+        _complaints = response.map<Map<String, dynamic>>((c) {
+          return {
+            "id": c['complaint_id'],
+            "title": c['category'],
+            "description": c['description'],
+            "upvotes": (c['upvotes'] as List).isNotEmpty
+                ? c['upvotes'][0]['count']
+                : 0,
+            "point": LatLng(
+              (c['latitude'] as num).toDouble(),
+              (c['longitude'] as num).toDouble(),
+            ),
+          };
+        }).toList();
 
-      debugPrint('Fetched ${_complaints.length} community complaints');
+        _isLoadingComplaints = false;
+      });
     } catch (e) {
-      debugPrint('Error fetching complaints: $e');
-      if (mounted) {
-        setState(() {
-          _complaints = [];
-          _loading = false;
-        });
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading complaints: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      debugPrint("Error fetching complaints: $e");
+      setState(() => _isLoadingComplaints = false);
     }
   }
 
-  // 2. Logic to Find User & Move Map
+  // ================= MOVE TO CURRENT LOCATION =================
+
   Future<void> _moveToCurrentLocation() async {
     bool serviceEnabled;
     LocationPermission permission;
 
-    // Check if location services are enabled
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      return Future.error('Location services are disabled.');
-    }
+    if (!serviceEnabled) return;
 
-    // Check permissions
     permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        return Future.error('Location permissions are denied');
-      }
+      if (permission == LocationPermission.denied) return;
     }
 
-    if (permission == LocationPermission.deniedForever) {
-      return Future.error('Location permissions are permanently denied.');
-    }
+    if (permission == LocationPermission.deniedForever) return;
 
-    // Get current position
     Position position = await Geolocator.getCurrentPosition();
 
-    // Move the map to the user's location
     _mapController.move(
       LatLng(position.latitude, position.longitude),
-      15.0, // Zoom level
+      15.0,
     );
   }
+
+  // ================= UPVOTE LOGIC =================
+
+  Future<void> _upvoteComplaint(String complaintId) async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+
+    if (user == null) return;
+
+    try {
+      await supabase.from('upvotes').insert({
+        'user_id': user.id,
+        'complaint_id': complaintId,
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Upvoted successfully")),
+      );
+
+      _fetchNearbyComplaints(); // Refresh list
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("You already upvoted this complaint")),
+      );
+    }
+  }
+
+  // ================= BUILD =================
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : Stack(
-              children: [
-                FlutterMap(
+      body: Stack(
+        children: [
+          _isLoadingComplaints
+              ? const Center(child: CircularProgressIndicator())
+              : FlutterMap(
                   mapController: _mapController,
                   options: MapOptions(
                     initialZoom: 10.0,
@@ -166,8 +149,10 @@ class _NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
                       urlTemplate:
                           'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
                       subdomains: const ['a', 'b', 'c'],
-                      userAgentPackageName: 'com.complaintapp.flutter_map',
+                      userAgentPackageName:
+                          'com.complaintapp.flutter_map',
                     ),
+
                     CurrentLocationLayer(
                       style: const LocationMarkerStyle(
                         marker: DefaultLocationMarker(
@@ -176,80 +161,65 @@ class _NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
                               color: Colors.white, size: 14),
                         ),
                         markerSize: Size(30, 30),
-                        markerDirection: MarkerDirection.heading,
-                        showHeadingSector: true,
-                        headingSectorColor:
-                            Color.fromARGB(120, 33, 149, 243),
-                        headingSectorRadius: 60,
                       ),
                     ),
+
                     MarkerLayer(
-                      markers: _complaints.asMap().entries.map((entry) {
+                      markers:
+                          _complaints.asMap().entries.map((entry) {
                         int index = entry.key;
-                        Map<String, dynamic> data = entry.value;
-
-                        final lat = data['latitude'];
-                        final lng = data['longitude'];
-
-                        if (lat == null || lng == null) {
-                          return null;
-                        }
+                        var data = entry.value;
 
                         return Marker(
-                          point: LatLng(
-                            double.parse(lat.toString()),
-                            double.parse(lng.toString()),
-                          ),
-                          width: 60,
-                          height: 60,
+                          point: data['point'],
+                          width: 35,
+                          height: 35,
                           child: GestureDetector(
                             onTap: () {
                               setState(() {
-                                if (_selectedMarkerIndex == index) {
-                                  _selectedMarkerIndex = null;
-                                } else {
-                                  _selectedMarkerIndex = index;
-                                }
+                                _selectedMarkerIndex =
+                                    _selectedMarkerIndex == index
+                                        ? null
+                                        : index;
                               });
                             },
-                            child: Column(
-                              children: [
-                                SvgPicture.asset(
-                                  'assets/marker.svg',
-                                  width: 35,
-                                  height: 35,
-                                ),
-                              ],
+                            child: SvgPicture.asset(
+                              'assets/marker.svg',
+                              width: 35,
+                              height: 35,
                             ),
                           ),
                         );
-                      }).whereType<Marker>().toList(),
+                      }).toList(),
                     ),
                   ],
                 ),
-                Positioned(
-                  bottom: 40,
-                  right: 20,
-                  child: FloatingActionButton(
-                    backgroundColor: Colors.white,
-                    child: const Icon(Icons.my_location, color: Colors.black87),
-                    onPressed: () {
-                      _moveToCurrentLocation();
-                    },
-                  ),
-                ),
-                if (_selectedMarkerIndex != null && _complaints.isNotEmpty)
-                  Positioned(
-                    bottom: 20,
-                    left: 20,
-                    right: 20,
-                    child: _buildComplaintPopup(
-                        _complaints[_selectedMarkerIndex!]),
-                  ),
-              ],
+
+          Positioned(
+            bottom: 40,
+            right: 20,
+            child: FloatingActionButton(
+              backgroundColor: Colors.white,
+              child: const Icon(Icons.my_location,
+                  color: Colors.black87),
+              onPressed: _moveToCurrentLocation,
             ),
+          ),
+
+          if (_selectedMarkerIndex != null)
+            Positioned(
+              bottom: 20,
+              left: 20,
+              right: 20,
+              child: _buildComplaintPopup(
+                  _complaints[_selectedMarkerIndex!]),
+            ),
+        ],
+      ),
     );
   }
+
+  // ================= POPUP =================
 
   Widget _buildComplaintPopup(Map<String, dynamic> data) {
     return Container(
@@ -271,65 +241,65 @@ class _NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment:
+                MainAxisAlignment.spaceBetween,
             children: [
               Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Tracking: ${data['tracking_code'] ?? "N/A"}',
+                    data['title'],
                     style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Issue: ${data['category'] ?? "N/A"}',
+                    "${data['upvotes']} Upvotes",
                     style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey,
-                    ),
+                        fontSize: 14,
+                        color: Colors.black87),
                   ),
                 ],
               ),
-              Icon(
-                Icons.location_on,
-                color: Colors.red,
-                size: 20,
+              GestureDetector(
+                onTap: () => setState(
+                    () => _selectedMarkerIndex = null),
+                child: const Icon(Icons.close,
+                    color: Colors.grey, size: 20),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Text(
-            data['description'] ?? "No description",
-            style: const TextStyle(fontSize: 12),
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
+            data['description'],
+            style: const TextStyle(fontSize: 14),
           ),
-          const SizedBox(height: 12),
-          Text(
-            'Status: ${data['status'] ?? "Pending"}',
-            style: TextStyle(
-              fontSize: 12,
-              color: _getStatusColor(data['status'] ?? "Pending"),
-              fontWeight: FontWeight.bold,
+          const SizedBox(height: 15),
+          SizedBox(
+            width: double.infinity,
+            height: 45,
+            child: ElevatedButton.icon(
+              onPressed: () =>
+                  _upvoteComplaint(data['id']),
+              icon: const Icon(Icons.thumb_up_alt_outlined,
+                  color: Colors.white, size: 20),
+              label: const Text("Upvote",
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor:
+                    const Color(0xFF3F51B5),
+                shape: RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.circular(8)),
+              ),
             ),
           ),
         ],
       ),
     );
-  }
-
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'resolved':
-        return Colors.green;
-      case 'in_progress':
-      case 'in-progress':
-        return Colors.orange;
-      default:
-        return Colors.red;
-    }
   }
 }

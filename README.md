@@ -61,6 +61,9 @@ flutter emulators --launch <emulatorId>
 
 # List connected devices
 flutter devices
+
+#regenerate development folder
+flutter create .
 ```
 
 ### ADB: connect and device management (Android)
