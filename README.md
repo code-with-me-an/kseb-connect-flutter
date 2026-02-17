@@ -1,16 +1,115 @@
-# kseb_connect
+# KSEB Connect
 
-A new Flutter project.
+KSEB Connect is a complaint registration, tracking and management Flutter app for KSEB (Kerala State Electricity Board). The app allows administrators and users to register complaints, track their status, and manage complaint workflows. It also includes a community complaint feature where users can view complaints submitted by others and upvote complaints they also face.
 
-## Getting Started
+## Key Features
 
-This project is a starting point for a Flutter application.
+- Complaint registration and tracking for KSEB services.
+- Admin dashboard for managing and updating complaint statuses.
+- Community complaints: view all user-submitted complaints and upvote the same complaint if affected.
+- User profile and complaint history.
+- Push notifications and real-time updates (if configured).
 
-A few resources to get you started if this is your first Flutter project:
+## Project Structure
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+This repository is a Flutter project. Main app code is under `lib/` and Android-specific files under `android/`.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Requirements
+
+- Flutter SDK (stable)
+- Android SDK and platform-tools (ADB)
+- A connected Android device or emulator
+
+## Useful Commands
+
+Run these commands from the project root.
+
+### Flutter: common development commands
+
+```bash
+# Fetch dependencies
+flutter pub get
+
+# Run the app on the default device or an attached device (choose device with `flutter devices`)
+flutter run
+
+# Run on a specific device by id
+flutter run -d <deviceId>
+
+# Build an Android APK (debug/release)
+flutter build apk --debug
+flutter build apk --release
+
+# Build an Android App Bundle for Play Store
+flutter build appbundle --release
+
+# Analyze code for issues
+flutter analyze
+
+# Run tests
+flutter test
+
+# Format Dart code
+flutter format .
+
+# Clean build artifacts
+flutter clean
+
+# List available emulators and launch one
+flutter emulators
+flutter emulators --launch <emulatorId>
+
+# List connected devices
+flutter devices
+```
+
+### ADB: connect and device management (Android)
+
+Use these to connect devices over USB or TCP/IP. On Windows, ensure device drivers are installed and USB debugging is enabled in Developer Options.
+
+```bash
+# List devices (USB and TCP)
+adb devices
+
+# If using USB and connection doesn't show, restart server
+adb kill-server
+adb start-server
+
+# For wireless debugging: enable TCP/IP on the device (via USB first)
+adb usb
+adb tcpip 5555
+# Then connect to device IP
+adb connect <device-ip>:5555
+
+# Example: adb connect 192.168.1.10:5555
+
+# Show logs
+adb logcat
+
+# Forward a device port to host (if needed)
+adb reverse tcp:8081 tcp:8081
+
+# Disconnect wireless
+adb disconnect <device-ip>:5555
+```
+
+Notes:
+- Replace `<deviceId>` and `<device-ip>` with actual values. Use `flutter devices` or `adb devices` to list IDs and IPs.
+- For wireless: connect device via USB first to enable `adb tcpip` or use the device's Wireless Debugging feature (Android 11+).
+
+## Running the app on an Android device (example)
+
+1. Ensure dependencies are installed: `flutter pub get`.
+2. Start an emulator or connect a device (`flutter devices` to verify).
+3. Run:
+
+```bash
+flutter run -d <deviceId>
+```
+
+## Contribution & Next Steps
+
+- Implement tests and CI for builds.
+- Add README sections for environment setup, screenshots, and deployment when available.
+
+
