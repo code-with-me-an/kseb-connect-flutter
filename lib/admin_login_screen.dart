@@ -56,12 +56,11 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
 
     try {
       final response = await supabase
-          .from('officers')
-          .select()
-          .eq('username', username)
-          .eq('password', password)
-          .eq('is_active', true)
-          .maybeSingle();
+    .rpc('verify_officer_login', params: {
+      'input_username': username,
+      'input_password': password,
+    })
+    .single();
 
       if (response != null) {
         final prefs = await SharedPreferences.getInstance();
