@@ -67,7 +67,7 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
           .select()
           .eq('section_id', officerSectionId!)
           .eq('complaint_type', 'community')
-          .order('created_at', ascending: false);
+          .order('created_at', ascending: true);
 
       if (mounted) {
         setState(() {
