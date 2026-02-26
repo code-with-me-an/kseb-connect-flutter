@@ -62,7 +62,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     })
     .single();
 
-      if (response != null) {
         final prefs = await SharedPreferences.getInstance();
 
         await prefs.setBool('admin_logged_in', true);
@@ -78,15 +77,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
             builder: (_) => const AdminLayout(),
           ),
         );
-      } else {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Invalid username or password"),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     } catch (e) {
       String errorMessage = 'Login failed';
 
