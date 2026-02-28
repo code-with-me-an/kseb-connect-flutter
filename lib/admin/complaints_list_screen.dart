@@ -62,13 +62,13 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
     if (mounted) setState(() => loading = true);
 
     try {
-      final response = await supabase
-          .from('complaints')
-          .select()
-          .eq('section_id', officerSectionId!)
-          .eq('complaint_type', 'community')
-          .order('created_at', ascending: true);
-
+ final response = await supabase
+    .from('complaints_with_upvotes')
+    .select()
+    .eq('section_id', officerSectionId!)
+    .eq('complaint_type', 'community')
+    .order('upvote_count', ascending: false)
+    .order('created_at', ascending: false);
       if (mounted) {
         setState(() {
           communityComplaints = List<Map<String, dynamic>>.from(response);
@@ -94,27 +94,45 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
   }
 
   void _listenToRealtime() {
-    try {
-      supabase
-          .channel('complaints-channel')
-          .onPostgresChanges(
-            event: PostgresChangeEvent.all,
-            schema: 'public',
-            table: 'complaints',
-            callback: (payload) {
-              try {
-                if (payload.newRecord['section_id'] == officerSectionId &&
-                    payload.newRecord['complaint_type'] == 'community') {
-                  _fetchCommunityComplaints();
-                }
-              } catch (e) {
-                // Handle error silently
-              }
-            },
-          )
-          .subscribe();
-    } catch (e) {
-      // Handle error silently
+  try {
+    // Listen for complaint changes
+    supabase
+        .channel('complaints-channel')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'complaints',
+          callback: (payload) {
+            if (!mounted) return;
+
+            final newRecord = payload.newRecord;
+
+            if (newRecord != null &&
+                newRecord['section_id'] == officerSectionId &&
+                newRecord['complaint_type'] == 'community') {
+              _fetchCommunityComplaints();
+            }
+          },
+        )
+        .subscribe();
+
+    // Listen for upvote changes
+    supabase
+        .channel('upvotes-channel')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'upvotes',
+          callback: (payload) {
+            if (!mounted) return;
+
+            // Simply refresh because upvote count changed
+            _fetchCommunityComplaints();
+          },
+        )
+        .subscribe();
+  } catch (e) {
+    // Silent fail
   }
 }
 
@@ -250,15 +268,18 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
       return [const Center(child: Text("No complaints found"))];
     }
 
-    return communityComplaints.map((complaint) {
-      return _buildComplaintCard(
-        title: "Tracking: ${complaint['tracking_code'] ?? ""}",
-        subtitle: "Issue: ${complaint['category'] ?? ""}",
-        detail: complaint['description'],
-        status: complaint['status'] ?? "Pending",
-        themeColor: themeColor,
-      );
-    }).toList();
+  return communityComplaints.map((complaint) {
+
+int upvoteCount = complaint['upvote_count'] ?? 0;
+
+  return _buildComplaintCard(
+    title: "Tracking: ${complaint['tracking_code'] ?? ""}",
+    subtitle: "Issue: ${complaint['category'] ?? ""}",
+    detail: "${complaint['description']}\n\nUpvotes: $upvoteCount",
+    status: complaint['status'] ?? "Pending",
+    themeColor: themeColor,
+  );
+}).toList();
   }
 
   // --- 2. Personal Complaints List ---
@@ -387,4 +408,9 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
       ),
     );
   }
+  @override
+void dispose() {
+  supabase.removeAllChannels();
+  super.dispose();
+}
 }
