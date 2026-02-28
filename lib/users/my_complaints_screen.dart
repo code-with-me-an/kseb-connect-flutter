@@ -19,6 +19,59 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
     super.initState();
     fetchComplaints();
   }
+  Future<void> deleteComplaint(String complaintId) async {
+  try {
+    await supabase
+        .from('complaints')
+        .delete()
+        .eq('tracking_code', complaintId);
+
+    // Remove from local list instantly (better UX)
+    setState(() {
+      complaints.removeWhere(
+          (complaint) => complaint['tracking_code'] == complaintId);
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Complaint deleted successfully"),
+        backgroundColor: Colors.green,
+      ),
+    );
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("Failed to delete complaint: $e"),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+}
+void confirmDelete(String complaintId) {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text("Delete Complaint"),
+      content: const Text("Are you sure you want to delete this complaint?"),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text("Cancel"),
+        ),
+        TextButton(
+          onPressed: () {
+            Navigator.pop(context);
+            deleteComplaint(complaintId);
+          },
+          child: const Text(
+            "Delete",
+            style: TextStyle(color: Colors.red),
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
   Future<void> fetchComplaints() async {
     if (mounted) setState(() => loading = true);
@@ -84,6 +137,7 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
                         final complaint = complaints[index];
 
                         return ComplaintCard(
+                          onDelete: () => confirmDelete(complaint['tracking_code']),
                           id: complaint['tracking_code'] ?? "",
                           title: complaint['category'] ?? "",
                           description: complaint['description'] ?? "",
@@ -129,6 +183,7 @@ class ComplaintCard extends StatelessWidget {
   final String statusLabel; // Text shown at the bottom
   final String statusButtonText; // Text inside the button
   final Color statusColor;
+  final VoidCallback onDelete;
 
   const ComplaintCard({
     super.key,
@@ -139,6 +194,7 @@ class ComplaintCard extends StatelessWidget {
     required this.statusLabel,
     required this.statusButtonText,
     required this.statusColor,
+    required this.onDelete,
   });
 
   @override
@@ -154,6 +210,7 @@ class ComplaintCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Top Section: Info and Status Badge
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -180,7 +237,6 @@ class ComplaintCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-
                     Text(
                       description,
                       style: TextStyle(
@@ -188,7 +244,6 @@ class ComplaintCard extends StatelessWidget {
                         color: Colors.grey[700],
                         height: 1.4,
                       ),
-
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis, // prevents overflow
                     ),
@@ -217,12 +272,39 @@ class ComplaintCard extends StatelessWidget {
             ],
           ),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: 16), // A little extra breathing room
 
-          // Bottom Line: Date and Small Status Label
-          Text(
-            "$date  •  $statusLabel",
-            style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+          // Bottom Section: Date/Status Text on Left, Delete on Right
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center, // Aligns them perfectly horizontally
+            children: [
+              // Left Side: Date and Small Status Label
+              Text(
+                "$date  •  $statusLabel",
+                style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+              ),
+
+              // Right Side: Delete Button
+              GestureDetector(
+                onTap: onDelete,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.delete_outline, color: Colors.red, size: 18),
+                    SizedBox(width: 4),
+                    Text(
+                      "Delete",
+                      style: TextStyle(
+                        color: Colors.red,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),

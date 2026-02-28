@@ -10,12 +10,11 @@ class NearByComplaintsScreen extends StatefulWidget {
   const NearByComplaintsScreen({super.key});
 
   @override
-  State<NearByComplaintsScreen> createState() =>
-      _NearByComplaintsScreenState();
+  State<NearByComplaintsScreen> createState() => NearByComplaintsScreenState();
 }
 
-class _NearByComplaintsScreenState
-    extends State<NearByComplaintsScreen> {
+class NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
+  DateTime? _lastFetchTime;
   final Color navyBlue = const Color(0xFF0D3B66);
   int? _selectedMarkerIndex;
   final MapController _mapController = MapController();
@@ -26,28 +25,51 @@ class _NearByComplaintsScreenState
   @override
   void initState() {
     super.initState();
-    _fetchNearbyComplaints();
+    fetchNearbyComplaints();
   }
 
   // ================= FETCH COMMUNITY COMPLAINTS =================
 
-  Future<void> _fetchNearbyComplaints() async {
+  Future<void> fetchNearbyComplaints({bool forceRefresh = false}) async {
+    if (!forceRefresh &&
+        _lastFetchTime != null &&
+        DateTime.now().difference(_lastFetchTime!).inSeconds < 30) {
+      return;
+    }
+
+    setState(() => _isLoadingComplaints = true);
+
     final supabase = Supabase.instance.client;
 
     try {
+      final userLocation = await _getUserLocation();
+      if (userLocation == null) {
+        setState(() => _isLoadingComplaints = false);
+        return;
+      }
+
+      const double radiusInDegrees = 0.05; // ~5km
+
+      final minLat = userLocation.latitude - radiusInDegrees;
+      final maxLat = userLocation.latitude + radiusInDegrees;
+      final minLng = userLocation.longitude - radiusInDegrees;
+      final maxLng = userLocation.longitude + radiusInDegrees;
+
       final response = await supabase
           .from('complaints')
           .select('''
-            complaint_id,
-            category,
-            description,
-            latitude,
-            longitude,
-            upvotes(count)
-          ''')
+          complaint_id,
+          category,
+          description,
+          latitude,
+          longitude,
+          upvotes(count)
+        ''')
           .eq('complaint_type', 'community')
-          .not('latitude', 'is', null)
-          .not('longitude', 'is', null);
+          .gte('latitude', minLat)
+          .lte('latitude', maxLat)
+          .gte('longitude', minLng)
+          .lte('longitude', maxLng);
 
       setState(() {
         _complaints = response.map<Map<String, dynamic>>((c) {
@@ -65,37 +87,41 @@ class _NearByComplaintsScreenState
           };
         }).toList();
 
+        _lastFetchTime = DateTime.now();
         _isLoadingComplaints = false;
       });
     } catch (e) {
-      debugPrint("Error fetching complaints: $e");
       setState(() => _isLoadingComplaints = false);
     }
   }
 
-  // ================= MOVE TO CURRENT LOCATION =================
+  // get user location
 
-  Future<void> _moveToCurrentLocation() async {
-    bool serviceEnabled;
-    LocationPermission permission;
+  Future<LatLng?> _getUserLocation() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return null;
 
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return;
-
-    permission = await Geolocator.checkPermission();
+    LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) return;
+      if (permission == LocationPermission.denied) return null;
     }
 
-    if (permission == LocationPermission.deniedForever) return;
+    if (permission == LocationPermission.deniedForever) return null;
 
     Position position = await Geolocator.getCurrentPosition();
 
-    _mapController.move(
-      LatLng(position.latitude, position.longitude),
-      15.0,
-    );
+    return LatLng(position.latitude, position.longitude);
+  }
+
+  // move to current location on map
+
+  Future<void> _moveToCurrentLocation() async {
+    final userLocation = await _getUserLocation();
+
+    if (userLocation == null) return;
+
+    _mapController.move(userLocation, 15.0);
   }
 
   // ================= UPVOTE LOGIC =================
@@ -112,11 +138,11 @@ class _NearByComplaintsScreenState
         'complaint_id': complaintId,
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Upvoted successfully")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Upvoted successfully")));
 
-      _fetchNearbyComplaints(); // Refresh list
+      fetchNearbyComplaints(); // Refresh list
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("You already upvoted this complaint")),
@@ -149,24 +175,25 @@ class _NearByComplaintsScreenState
                       urlTemplate:
                           'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
                       subdomains: const ['a', 'b', 'c'],
-                      userAgentPackageName:
-                          'com.complaintapp.flutter_map',
+                      userAgentPackageName: 'com.complaintapp.flutter_map',
                     ),
 
                     CurrentLocationLayer(
                       style: const LocationMarkerStyle(
                         marker: DefaultLocationMarker(
                           color: Color.fromARGB(255, 22, 119, 199),
-                          child: Icon(Icons.navigation,
-                              color: Colors.white, size: 14),
+                          child: Icon(
+                            Icons.navigation,
+                            color: Colors.white,
+                            size: 14,
+                          ),
                         ),
                         markerSize: Size(30, 30),
                       ),
                     ),
 
                     MarkerLayer(
-                      markers:
-                          _complaints.asMap().entries.map((entry) {
+                      markers: _complaints.asMap().entries.map((entry) {
                         int index = entry.key;
                         var data = entry.value;
 
@@ -179,8 +206,8 @@ class _NearByComplaintsScreenState
                               setState(() {
                                 _selectedMarkerIndex =
                                     _selectedMarkerIndex == index
-                                        ? null
-                                        : index;
+                                    ? null
+                                    : index;
                               });
                             },
                             child: SvgPicture.asset(
@@ -200,8 +227,7 @@ class _NearByComplaintsScreenState
             right: 20,
             child: FloatingActionButton(
               backgroundColor: Colors.white,
-              child: const Icon(Icons.my_location,
-                  color: Colors.black87),
+              child: const Icon(Icons.my_location, color: Colors.black87),
               onPressed: _moveToCurrentLocation,
             ),
           ),
@@ -211,8 +237,7 @@ class _NearByComplaintsScreenState
               bottom: 20,
               left: 20,
               right: 20,
-              child: _buildComplaintPopup(
-                  _complaints[_selectedMarkerIndex!]),
+              child: _buildComplaintPopup(_complaints[_selectedMarkerIndex!]),
             ),
         ],
       ),
@@ -229,6 +254,7 @@ class _NearByComplaintsScreenState
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
+            // ignore: deprecated_member_use
             color: Colors.black.withOpacity(0.1),
             blurRadius: 10,
             spreadRadius: 2,
@@ -241,60 +267,56 @@ class _NearByComplaintsScreenState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment:
-                MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     data['title'],
                     style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold),
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     "${data['upvotes']} Upvotes",
-                    style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.black87),
+                    style: const TextStyle(fontSize: 14, color: Colors.black87),
                   ),
                 ],
               ),
               GestureDetector(
-                onTap: () => setState(
-                    () => _selectedMarkerIndex = null),
-                child: const Icon(Icons.close,
-                    color: Colors.grey, size: 20),
+                onTap: () => setState(() => _selectedMarkerIndex = null),
+                child: const Icon(Icons.close, color: Colors.grey, size: 20),
               ),
             ],
           ),
           const SizedBox(height: 10),
-          Text(
-            data['description'],
-            style: const TextStyle(fontSize: 14),
-          ),
+          Text(data['description'], style: const TextStyle(fontSize: 14)),
           const SizedBox(height: 15),
           SizedBox(
             width: double.infinity,
             height: 45,
             child: ElevatedButton.icon(
-              onPressed: () =>
-                  _upvoteComplaint(data['id']),
-              icon: const Icon(Icons.thumb_up_alt_outlined,
-                  color: Colors.white, size: 20),
-              label: const Text("Upvote",
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold)),
+              onPressed: () => _upvoteComplaint(data['id']),
+              icon: const Icon(
+                Icons.thumb_up_alt_outlined,
+                color: Colors.white,
+                size: 20,
+              ),
+              label: const Text(
+                "Upvote",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    const Color(0xFF3F51B5),
+                backgroundColor: const Color(0xFF3F51B5),
                 shape: RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.circular(8)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
           ),

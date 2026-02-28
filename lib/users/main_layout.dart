@@ -14,12 +14,8 @@ class MainLayout extends StatefulWidget {
 class _MainLayoutState extends State<MainLayout> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = const [
-    HomeScreen(),
-    MyComplaintsScreen(),
-    NearByComplaintsScreen(),
-    ProfileScreen(),
-  ];
+  final GlobalKey<NearByComplaintsScreenState> mapKey =
+      GlobalKey<NearByComplaintsScreenState>();
 
   final List<String> _titles = const [
     "Hello, User",
@@ -35,7 +31,8 @@ class _MainLayoutState extends State<MainLayout> {
       builder: (BuildContext context) {
         return Dialog(
           shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20.0)), // Rounded corners
+            borderRadius: BorderRadius.circular(20.0),
+          ), // Rounded corners
           child: Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -52,8 +49,10 @@ class _MainLayoutState extends State<MainLayout> {
                   children: [
                     const Text(
                       "Notifications",
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     GestureDetector(
                       onTap: () => Navigator.of(context).pop(),
@@ -96,7 +95,7 @@ class _MainLayoutState extends State<MainLayout> {
                     onPressed: () {},
                     child: const Text("View All Notifications"),
                   ),
-                )
+                ),
               ],
             ),
           ),
@@ -132,9 +131,10 @@ class _MainLayoutState extends State<MainLayout> {
               Text(
                 title,
                 style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87),
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
               ),
               const SizedBox(height: 2),
               Text(
@@ -184,7 +184,12 @@ class _MainLayoutState extends State<MainLayout> {
       // ✅ BODY SWITCHES HERE
       body: IndexedStack(
         index: _currentIndex,
-        children: _screens,
+        children: [
+          const HomeScreen(),
+          const MyComplaintsScreen(),
+          NearByComplaintsScreen(key: mapKey),
+          const ProfileScreen(),
+        ],
       ),
 
       // ✅ BOTTOM BAR (single)
@@ -198,15 +203,24 @@ class _MainLayoutState extends State<MainLayout> {
           setState(() {
             _currentIndex = index;
           });
+          if (index == 2) {
+            mapKey.currentState?.fetchNearbyComplaints();
+          }
         },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
           BottomNavigationBarItem(
-              icon: Icon(Icons.chat_bubble_outline), label: "Complaints"),
+            icon: Icon(Icons.chat_bubble_outline),
+            label: "Complaints",
+          ),
           BottomNavigationBarItem(
-              icon: Icon(Icons.location_on_outlined), label: "Map"),
+            icon: Icon(Icons.location_on_outlined),
+            label: "Map",
+          ),
           BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline), label: "Profile"),
+            icon: Icon(Icons.person_outline),
+            label: "Profile",
+          ),
         ],
       ),
     );

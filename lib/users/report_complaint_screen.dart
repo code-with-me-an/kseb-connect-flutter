@@ -17,7 +17,7 @@ class ReportComplaintScreen extends StatefulWidget {
 }
 
 class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
-    final supabase = Supabase.instance.client;
+  final supabase = Supabase.instance.client;
 
   List<dynamic> _consumerConnections = [];
   String? _selectedConsumerId;
@@ -44,6 +44,91 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
     String numbers = random.nextInt(100000).toString().padLeft(5, '0');
 
     return letters + numbers;
+  }
+
+  double _calculateDistance(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
+    const double earthRadius = 6371; // in KM
+
+    double dLat = _deg2rad(lat2 - lat1);
+    double dLon = _deg2rad(lon2 - lon1);
+
+    double a =
+        (sin(dLat / 2) * sin(dLat / 2)) +
+        cos(_deg2rad(lat1)) *
+            cos(_deg2rad(lat2)) *
+            (sin(dLon / 2) * sin(dLon / 2));
+
+    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+
+    return earthRadius * c; // Distance in KM
+  }
+
+  double _deg2rad(double deg) {
+    return deg * (pi / 180);
+  }
+
+  Future<void> _findNearestSection() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    if (_selectedLocation == null) {
+      await _getCurrentLocation();
+    }
+
+    if (_selectedLocation == null) {
+      throw Exception("Unable to get user location");
+    }
+
+    try {
+      // Fetch all section offices
+      final sections = await supabase
+          .from('sections')
+          .select('section_id, latitude, longitude');
+
+      double minDistance = double.infinity;
+      String? nearestSectionId;
+      debugPrint(
+        "User Location: ${_selectedLocation?.latitude}, ${_selectedLocation?.longitude}",
+      );
+      debugPrint("Sections fetched count: ${sections.length}");
+
+      for (var section in sections) {
+        final sectionLat = double.tryParse(section['latitude'].toString());
+        final sectionLon = double.tryParse(section['longitude'].toString());
+
+        if (sectionLat == null || sectionLon == null) continue;
+
+        double distance = _calculateDistance(
+          _selectedLocation!.latitude,
+          _selectedLocation!.longitude,
+          sectionLat,
+          sectionLon,
+        );
+
+        if (distance < minDistance) {
+          minDistance = distance;
+          nearestSectionId = section['section_id'].toString();
+        }
+      }
+
+      if (nearestSectionId != null) {
+        setState(() {
+          _selectedSectionId = nearestSectionId;
+        });
+
+        debugPrint("Nearest Section Assigned: $nearestSectionId");
+      } else {
+        throw Exception("No section found");
+      }
+    } catch (e) {
+      debugPrint("Error finding nearest section: $e");
+      rethrow;
+    }
   }
 
   Future<String> generateUniqueTrackingCode() async {
@@ -144,7 +229,9 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
 
     try {
       await supabase.storage.from('complaint-images').upload(fileName, image);
-      final url = supabase.storage.from('complaint-images').getPublicUrl(fileName);
+      final url = supabase.storage
+          .from('complaint-images')
+          .getPublicUrl(fileName);
       return url;
     } catch (e) {
       debugPrint('Error uploading image: $e');
@@ -183,6 +270,10 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
       throw Exception("Please select a location on the map.");
     }
 
+    if (complaintType == 'community' && _selectedSectionId == null) {
+      await _findNearestSection();
+    }
+
     // ✅ ADD THIS: Require section for all complaints
     if (_selectedSectionId == null || _selectedSectionId!.isEmpty) {
       throw Exception("Please select a section for the complaint");
@@ -211,7 +302,9 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
       showDialog(
         context: context,
         builder: (_) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           child: Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
@@ -311,7 +404,7 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
       );
     } catch (e) {
       debugPrint('Error submitting complaint: $e');
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -322,40 +415,41 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
       }
     }
   }
-Future<void> fetchConsumerConnections() async {
-  final user = supabase.auth.currentUser;
 
-  if (user == null) return;
+  Future<void> fetchConsumerConnections() async {
+    final user = supabase.auth.currentUser;
 
-  try {
-    final response = await supabase
-        .from('consumer_connections')
-        .select()
-        .eq('user_id', user.id);
+    if (user == null) return;
 
-    if (mounted) {
-      setState(() {
-        _consumerConnections = response;
-      });
-    }
-  } catch (e) {
-    debugPrint('Error fetching consumer connections: $e');
-    if (mounted) {
-      setState(() {
-        _consumerConnections = [];
-      });
-    }
-    
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error loading connections: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+    try {
+      final response = await supabase
+          .from('consumer_connections')
+          .select()
+          .eq('user_id', user.id);
+
+      if (mounted) {
+        setState(() {
+          _consumerConnections = response;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching consumer connections: $e');
+      if (mounted) {
+        setState(() {
+          _consumerConnections = [];
+        });
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading connections: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
-}
 
   // ✅ NEW METHOD: Get user's default section for community complaints
   Future<void> _fetchUserDefaultSection() async {
@@ -379,7 +473,9 @@ Future<void> fetchConsumerConnections() async {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('No section found. Please add a consumer connection.'),
+              content: Text(
+                'No section found. Please add a consumer connection.',
+              ),
               backgroundColor: Colors.red,
             ),
           );
@@ -389,10 +485,7 @@ Future<void> fetchConsumerConnections() async {
       debugPrint('Error fetching default section: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -429,92 +522,94 @@ Future<void> fetchConsumerConnections() async {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ======================
-// 🔥 IMPROVEMENT 1: Added Category Dropdown (Personal / Community)
-// ======================
+            // 🔥 IMPROVEMENT 1: Added Category Dropdown (Personal / Community)
+            // ======================
+            _buildCustomDropdown(
+              hint: "Select Category",
+              value: category,
+              items: const [
+                {"value": "Personal", "label": "Personal"},
+                {"value": "Community", "label": "Community"},
+              ],
+              onChanged: (v) async {
+                if (mounted) {
+                  setState(() {
+                    category = v;
 
-_buildCustomDropdown(
-  hint: "Select Category",
-  value: category,
-  items: const [
-    {"value": "Personal", "label": "Personal"},
-    {"value": "Community", "label": "Community"},
-  ],
-  onChanged: (v) async {
-    if (mounted) {
-      setState(() {
-        category = v;
+                    // ✅ CHANGED: Reset section only for Personal
+                    if (v == "Personal") {
+                      _selectedSectionId = null;
+                    }
+                    _selectedConsumerId = null;
+                  });
+                }
 
-        // ✅ CHANGED: Reset section only for Personal
-        if (v == "Personal") {
-          _selectedSectionId = null;
-        }
-        _selectedConsumerId = null;
-      });
-    }
-
-    // ✅ CHANGED: Fetch connections for Personal, section for Community
-    if (v == "Personal") {
-      await fetchConsumerConnections();
-    } else if (v == "Community") {
-      await _fetchUserDefaultSection();
-    }
-  },
-),
-
-const SizedBox(height: 15),
-// 🔥 IMPROVEMENT 4: Proper dropdown map structure (prevents assertion error)
-_buildCustomDropdown(
-  hint: "Select Complaint Type",
-  value: complaintType,
-  items: [
-    'power_outage',
-    'voltage_issue',
-    'billing_issue',
-    'meter_issue',
-    'line_issue',
-    'transformer_issue',
-    'street_light',
-    'safety_hazard',
-    'etc',
-  ].map((e) => {
-        "value": e,
-        "label": e.replaceAll('_', ' ').toUpperCase(),
-      }).toList(),
-  onChanged: (v) {
-    if (mounted) setState(() => complaintType = v);
-  },
-),
+                // ✅ CHANGED: Fetch connections for Personal, section for Community
+                if (v == "Personal") {
+                  await fetchConsumerConnections();
+                } else if (v == "Community") {
+                  await _findNearestSection();
+                }
+              },
+            ),
 
             const SizedBox(height: 15),
-// ======================
-// 🔥 IMPROVEMENT 5: Show Consumer Dropdown ONLY if Personal
-// ======================
+            // 🔥 IMPROVEMENT 4: Proper dropdown map structure (prevents assertion error)
+            _buildCustomDropdown(
+              hint: "Select Complaint Type",
+              value: complaintType,
+              items:
+                  [
+                        'power_outage',
+                        'voltage_issue',
+                        'billing_issue',
+                        'meter_issue',
+                        'line_issue',
+                        'transformer_issue',
+                        'street_light',
+                        'safety_hazard',
+                        'etc',
+                      ]
+                      .map(
+                        (e) => {
+                          "value": e,
+                          "label": e.replaceAll('_', ' ').toUpperCase(),
+                        },
+                      )
+                      .toList(),
+              onChanged: (v) {
+                if (mounted) setState(() => complaintType = v);
+              },
+            ),
 
-if (category == "Personal" && _consumerConnections.isNotEmpty)
-  _buildCustomDropdown(
-    hint: "Select Consumer Number",
-    value: _selectedConsumerId,
-    items: _consumerConnections.map<Map<String, String>>((e) {
-      return {
-        "value": e['consumer_id'].toString(),
-        "label": e['consumer_number'].toString(),
-      };
-    }).toList(),
-    onChanged: (val) {
-      final selected = _consumerConnections
-          .firstWhere((e) => e['consumer_id'].toString() == val);
+            const SizedBox(height: 15),
 
-      if (mounted) {
-        setState(() {
-          _selectedConsumerId = selected['consumer_id'].toString();
-          _selectedSectionId = selected['section_id'].toString();
-        });
-      }
-    },
-  ),
+            // ======================
+            // 🔥 IMPROVEMENT 5: Show Consumer Dropdown ONLY if Personal
+            // ======================
+            if (category == "Personal" && _consumerConnections.isNotEmpty)
+              _buildCustomDropdown(
+                hint: "Select Consumer Number",
+                value: _selectedConsumerId,
+                items: _consumerConnections.map<Map<String, String>>((e) {
+                  return {
+                    "value": e['consumer_id'].toString(),
+                    "label": e['consumer_number'].toString(),
+                  };
+                }).toList(),
+                onChanged: (val) {
+                  final selected = _consumerConnections.firstWhere(
+                    (e) => e['consumer_id'].toString() == val,
+                  );
 
-
-
+                  if (mounted) {
+                    setState(() {
+                      _selectedConsumerId = selected['consumer_id'].toString();
+                      _selectedSectionId = selected['section_id'].toString();
+                    });
+                  }
+                },
+              ),
 
             const SizedBox(height: 15),
             Container(
@@ -714,12 +809,15 @@ if (category == "Personal" && _consumerConnections.isNotEmpty)
                           );
                           return;
                         }
-                      if (category == "Personal" && _selectedConsumerId == null) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text("Please select consumer number")),
-  );
-  return;
-}
+                        if (category == "Personal" &&
+                            _selectedConsumerId == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("Please select consumer number"),
+                            ),
+                          );
+                          return;
+                        }
 
                         if (mounted) setState(() => submitting = true);
 
@@ -778,10 +876,10 @@ if (category == "Personal" && _consumerConnections.isNotEmpty)
   }
 
   Widget _buildCustomDropdown({
-     required String hint,
-  required String? value,
-  required List<Map<String, String>> items,
-  required Function(String?) onChanged,
+    required String hint,
+    required String? value,
+    required List<Map<String, String>> items,
+    required Function(String?) onChanged,
   }) {
     return Container(
       width: double.infinity,
@@ -803,19 +901,19 @@ if (category == "Personal" && _consumerConnections.isNotEmpty)
           icon: const Icon(Icons.keyboard_arrow_down, color: Colors.grey),
           dropdownColor: Colors.white,
           borderRadius: BorderRadius.circular(12),
-         items: items.map((item) {
-  return DropdownMenuItem<String>(
-    value: item['value'],
-    child: Text(
-      item['label']!,
-      style: const TextStyle(
-        fontSize: 15,
-        color: Colors.black87,
-        fontWeight: FontWeight.w500,
-      ),
-    ),
-  );
-}).toList(),
+          items: items.map((item) {
+            return DropdownMenuItem<String>(
+              value: item['value'],
+              child: Text(
+                item['label']!,
+                style: const TextStyle(
+                  fontSize: 15,
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            );
+          }).toList(),
 
           onChanged: onChanged,
         ),
