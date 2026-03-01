@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'report_complaint_screen.dart';
+import 'package:provider/provider.dart';
+import '../providers/user_data_provider.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,11 +18,99 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String userName = "User";
   bool loading = true;
+  String locationName = "Fetching location...";
+  bool locationLoading = true;
 
   @override
   void initState() {
     super.initState();
+
     _fetchUserName();
+    _fetchCurrentLocationName();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadUserConsumers();
+    });
+  }
+
+  Future<void> _fetchCurrentLocationName() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        setState(() {
+          locationName = "Location Disabled";
+          locationLoading = false;
+        });
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() {
+            locationName = "Permission Denied";
+            locationLoading = false;
+          });
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        setState(() {
+          locationName = "Permission Permanently Denied";
+          locationLoading = false;
+        });
+        return;
+      }
+
+      Position position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (placemarks.isNotEmpty) {
+        final place = placemarks.first;
+
+        setState(() {
+          locationName =
+              place.locality ??
+              place.subLocality ??
+              place.administrativeArea ??
+              "Unknown Location";
+          locationLoading = false;
+        });
+      } else {
+        setState(() {
+          locationName = "Unknown Location";
+          locationLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("LOCATION ERROR: $e");
+      setState(() {
+        locationName = "Location Error";
+        locationLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadUserConsumers() async {
+    final user = supabase.auth.currentUser;
+
+    if (user == null) return;
+    final provider = context.read<UserDataProvider>();
+    if (provider.consumerConnections.isEmpty) {
+      await provider.loadConsumers(user.id);
+    }
   }
 
   Future<void> _fetchUserName() async {
@@ -60,9 +152,10 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading profile: $e')),
-      );
+      ScaffoldMessenger.of(
+        // ignore: use_build_context_synchronously
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error loading profile: $e')));
     }
   }
 
@@ -80,10 +173,10 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // 1. Location Text
-            const Center(
+            Center(
               child: Text(
-                "Location: Westhill",
-                style: TextStyle(
+                "Location: $locationName",
+                style: const TextStyle(
                   color: Colors.grey,
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -101,6 +194,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
+                    // ignore: deprecated_member_use
                     color: Colors.black.withOpacity(0.05),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
