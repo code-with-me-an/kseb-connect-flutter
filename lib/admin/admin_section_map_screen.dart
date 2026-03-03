@@ -222,16 +222,20 @@ void initState() {
 
         const SizedBox(height: 10),
 
-        if (photoUrl != null)
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.network(
-              photoUrl,
-              height: 150,
-              width: double.infinity,
-              fit: BoxFit.cover,
-            ),
-          ),
+     if (complaint['image_url'] != null &&
+    complaint['image_url'].toString().isNotEmpty)
+  Padding(
+    padding: const EdgeInsets.only(top: 10),
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Image.network(
+        complaint['image_url'],
+        height: 150,
+        width: double.infinity,
+        fit: BoxFit.cover,
+      ),
+    ),
+  ),
 
         const SizedBox(height: 12),
 
