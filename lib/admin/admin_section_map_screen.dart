@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class AdminSectionMapScreen extends StatefulWidget {
   const AdminSectionMapScreen({super.key});
@@ -38,7 +39,7 @@ class _AdminSectionMapScreenState extends State<AdminSectionMapScreen> {
 
       try {
         final response = await supabase
-            .from('complaints')
+            .from('complaints_with_upvotes')
             .select()
             .eq('section_id', sectionId);
 
@@ -98,16 +99,35 @@ class _AdminSectionMapScreenState extends State<AdminSectionMapScreen> {
           double.parse(lat.toString()),
           double.parse(lng.toString()),
         ),
-        width: 40,
-        height: 40,
-        child: Icon(
-          Icons.location_on,
-          size: 35,
-          
-          color: type == 'community'
-              ? Colors.red
-              : Colors.blue,
-        ),
+        width: 50,
+        height: 50,
+      child: type == 'community'
+    ? Stack(
+        alignment: Alignment.center,
+        children: [
+          SvgPicture.asset(
+            'assets/communityicon.svg',
+            width: 35,
+            height: 35,
+          ),
+          Positioned(
+            top: 12,
+            child: Text(
+              "${complaint['upvote_count'] ?? 0}",
+              style: const TextStyle(
+                color: Colors.white,//COLOR WHITE AKKANAM
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
+      )
+    : SvgPicture.asset(
+        "assets/personalicon.svg",
+        width: 25,
+        height: 25,
+      ),
       );
 
     }).whereType<Marker>().toList(),
