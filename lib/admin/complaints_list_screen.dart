@@ -96,6 +96,7 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
       );
     }
   }
+
   Future<void> _fetchPersonalComplaints() async {
   if (officerSectionId == null) return;
 
@@ -123,17 +124,13 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
       });
     }
 
-    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Error loading personal complaints: $e'),
-        backgroundColor: Colors.red,
-      ),
+      SnackBar(content: Text("Error loading personal complaints: $e")),
     );
   }
 }
 
-void _listenToRealtime() {
+  void _listenToRealtime() {
   try {
     // Listen for complaint changes
     supabase
@@ -456,7 +453,6 @@ return communityComplaints.map((complaint) {
     );
   }
 
-
   Future<void> _showStatusDialog({
     required String complaintId,
     required String currentStatus,
@@ -536,7 +532,8 @@ return communityComplaints.map((complaint) {
       ).showSnackBar(SnackBar(content: Text("Error: $e")));
     }
   }
-    @override
+  
+   @override
 void dispose() {
   supabase.removeAllChannels();
   super.dispose();
