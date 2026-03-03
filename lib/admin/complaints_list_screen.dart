@@ -62,16 +62,16 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
     if (mounted) setState(() => loading = true);
 
     try {
- final response = await supabase
-    .from('complaints_with_upvotes')
-    .select()
-    .eq('section_id', officerSectionId!)
-    .eq('complaint_type', 'community')
-    .order('upvote_count', ascending: false)
-    .order('created_at', ascending: false);
-//for debug....remove cheyyanam
+      final response = await supabase
+          .from('complaints_with_upvotes')
+          .select()
+          .eq('section_id', officerSectionId!)
+          .eq('complaint_type', 'community')
+          .order('upvote_count', ascending: false)
+          .order('created_at', ascending: false);
+      //for debug....remove cheyyanam
       print("Fetched complaints:");
-    print(response);
+      print(response);
 
       if (mounted) {
         setState(() {
@@ -98,41 +98,40 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
   }
 
   Future<void> _fetchPersonalComplaints() async {
-  if (officerSectionId == null) return;
+    if (officerSectionId == null) return;
 
-  if (mounted) setState(() => loading = true);
+    if (mounted) setState(() => loading = true);
 
-  try {
-    final response = await supabase
-        .from('complaints')
-        .select()
-        .eq('section_id', officerSectionId!)
-        .eq('complaint_type', 'personal')
-        .order('created_at', ascending: true);
+    try {
+      final response = await supabase
+          .from('complaints')
+          .select()
+          .eq('section_id', officerSectionId!)
+          .eq('complaint_type', 'personal')
+          .order('created_at', ascending: true);
 
-    if (mounted) {
-      setState(() {
-        personalComplaints = List<Map<String, dynamic>>.from(response);
-        loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          personalComplaints = List<Map<String, dynamic>>.from(response);
+          loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          personalComplaints = [];
+          loading = false;
+        });
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error loading personal complaints: $e")),
+      );
     }
-  } catch (e) {
-    if (mounted) {
-      setState(() {
-        personalComplaints = [];
-        loading = false;
-      });
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Error loading personal complaints: $e")),
-    );
   }
-}
 
   void _listenToRealtime() {
   try {
-    // Listen for complaint changes
     supabase
         .channel('complaints-channel')
         .onPostgresChanges(
@@ -140,44 +139,28 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
           schema: 'public',
           table: 'complaints',
           callback: (payload) {
-            if (!mounted) return;
+            if (!mounted || officerSectionId == null) return;
 
-            final newRecord = payload.newRecord;
+            final record = payload.newRecord.isNotEmpty
+                ? payload.newRecord
+                : payload.oldRecord;
 
-           if (newRecord != null &&
-    newRecord['section_id'] == officerSectionId) {
+            if (record['section_id'] == officerSectionId) {
 
-  if (newRecord['complaint_type'] == 'community') {
-    _fetchCommunityComplaints();
-  } 
-  else if (newRecord['complaint_type'] == 'personal') {
-    _fetchPersonalComplaints();
-  }
-       }
-          },
-        )
-        .subscribe();
-
-    // Listen for upvote changes
-    supabase
-        .channel('upvotes-channel')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'upvotes',
-          callback: (payload) {
-            if (!mounted) return;
-
-            // Refresh because upvote count changed
-            _fetchCommunityComplaints();
+              if (record['complaint_type'] == 'community') {
+                _fetchCommunityComplaints();
+              } 
+              else if (record['complaint_type'] == 'personal') {
+                _fetchPersonalComplaints();
+              }
+            }
           },
         )
         .subscribe();
   } catch (e) {
-    // Silent fail
+    debugPrint("Realtime error: $e");
   }
 }
-
 
   final supabase = Supabase.instance.client;
 
@@ -284,9 +267,7 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
                 onRefresh: () async {
                   if (isCommunitySelected) {
                     await _fetchCommunityComplaints();
-                  }
-                  else 
-                  {
+                  } else {
                     await _fetchPersonalComplaints();
                   }
                 },
@@ -315,41 +296,41 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
       return [const Center(child: Text("No complaints found"))];
     }
 
-return communityComplaints.map((complaint) {
-  int upvoteCount = complaint['upvote_count'] ?? 0;
+    return communityComplaints.map((complaint) {
+      int upvoteCount = complaint['upvote_count'] ?? 0;
 
-  return _buildComplaintCard(
-    complaintId: complaint['complaint_id'].toString(),
-    title: "Tracking: ${complaint['tracking_code'] ?? ""}",
-    subtitle: "Issue: ${complaint['category'] ?? ""}",
-    detail: "${complaint['description']}\n\nUpvotes: $upvoteCount",
-    status: complaint['status'] ?? "Pending",
-    themeColor: themeColor,
-  );
-}).toList();
+      return _buildComplaintCard(
+        complaintId: complaint['complaint_id'],
+        title: "Tracking: ${complaint['tracking_code'] ?? ""}",
+        subtitle: "Issue: ${complaint['category'] ?? ""}",
+        detail: "${complaint['description']}\n\nUpvotes: $upvoteCount",
+        status: complaint['status'] ?? "Pending",
+        themeColor: themeColor,
+      );
+    }).toList();
   }
 
   // --- 2. Personal Complaints List ---
   List<Widget> _buildPersonalList(Color themeColor) {
-  if (loading) {
-    return [const Center(child: CircularProgressIndicator())];
-  }
+    if (loading) {
+      return [const Center(child: CircularProgressIndicator())];
+    }
 
-  if (personalComplaints.isEmpty) {
-    return [const Center(child: Text("No personal complaints found"))];
-  }
+    if (personalComplaints.isEmpty) {
+      return [const Center(child: Text("No personal complaints found"))];
+    }
 
-  return personalComplaints.map((complaint) {
-    return _buildComplaintCard(
-      complaintId: complaint['complaint_id'],
-      title: "Tracking: ${complaint['tracking_code'] ?? ""}",
-      subtitle: "Issue: ${complaint['category'] ?? ""}",
-      detail: complaint['description'],
-      status: complaint['status'] ?? "Pending",
-      themeColor: themeColor,
-    );
-  }).toList();
-}
+    return personalComplaints.map((complaint) {
+      return _buildComplaintCard(
+        complaintId: complaint['complaint_id'],
+        title: "Tracking: ${complaint['tracking_code'] ?? ""}",
+        subtitle: "Issue: ${complaint['category'] ?? ""}",
+        detail: complaint['description'],
+        status: complaint['status'] ?? "Pending",
+        themeColor: themeColor,
+      );
+    }).toList();
+  }
 
   // --- Helper: Complaint Card Widget ---
   Widget _buildComplaintCard({
@@ -465,13 +446,10 @@ return communityComplaints.map((complaint) {
         return AlertDialog(
           title: const Text("Update Status"),
           content: DropdownButtonFormField<String>(
-            value: selectedStatus,
+            initialValue: selectedStatus,
             items: const [
               DropdownMenuItem(value: "pending", child: Text("Pending")),
-              DropdownMenuItem(
-                value: "in-progress",
-                child: Text("In-Progress"),
-              ),
+              DropdownMenuItem(value: "in-progress",child: Text("In-Progress"),),
               DropdownMenuItem(value: "resolved", child: Text("Resolved")),
             ],
             onChanged: (value) {
@@ -526,16 +504,17 @@ return communityComplaints.map((complaint) {
       });
 
       _fetchCommunityComplaints();
+      _fetchPersonalComplaints();
     } catch (e) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text("Error: $e")));
     }
   }
-  
-   @override
-void dispose() {
-  supabase.removeAllChannels();
-  super.dispose();
-}
+
+  @override
+  void dispose() {
+    supabase.removeAllChannels();
+    super.dispose();
+  }
 }
