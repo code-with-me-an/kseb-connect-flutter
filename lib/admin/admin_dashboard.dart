@@ -50,7 +50,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
         if (status == 'pending') {
           pending++;
-        } else if (status == 'in_progress') {
+        } else if (status == 'in-progress') {
           inProgress++;
         } else if (status == 'resolved') {
           resolved++;
@@ -157,7 +157,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: .05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),

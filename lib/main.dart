@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:kseb_connect/providers/home_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -18,7 +19,10 @@ Future<void> main() async {
 
   runApp(
     MultiProvider(
-      providers: [ChangeNotifierProvider(create: (_) => UserDataProvider())],
+      providers: [
+        ChangeNotifierProvider(create: (_) => UserDataProvider()),
+        ChangeNotifierProvider(create: (_) => HomeProvider()),
+      ],
       child: const MyApp(),
     ),
   );

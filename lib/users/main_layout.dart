@@ -3,6 +3,7 @@ import 'home_screen.dart';
 import 'my_complaints_screen.dart';
 import 'nearby_complaints_screen.dart';
 import 'profile_screen.dart';
+import 'about_us_screen.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -13,12 +14,12 @@ class MainLayout extends StatefulWidget {
 
 class _MainLayoutState extends State<MainLayout> {
   int _currentIndex = 0;
-
+  bool showAbout = false;
   final GlobalKey<NearByComplaintsScreenState> mapKey =
       GlobalKey<NearByComplaintsScreenState>();
 
-  final List<String> _titles = const [
-    "Hello, User",
+  final List<String> _titles = [
+    "KSEB Connect",
     "My Complaints",
     "Nearby Complaints",
     "My Profile",
@@ -164,7 +165,7 @@ class _MainLayoutState extends State<MainLayout> {
         elevation: 0,
         centerTitle: true,
         title: Text(
-          _titles[_currentIndex],
+          showAbout ? "About Us" : _titles[_currentIndex],
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w500,
@@ -182,13 +183,21 @@ class _MainLayoutState extends State<MainLayout> {
       ),
 
       // ✅ BODY SWITCHES HERE
-      body: IndexedStack(
+      body: showAbout
+    ? const AboutUsScreen()
+    : IndexedStack(
         index: _currentIndex,
         children: [
           const HomeScreen(),
           const MyComplaintsScreen(),
           NearByComplaintsScreen(key: mapKey),
-          const ProfileScreen(),
+          ProfileScreen(
+            onAboutTap: () {
+              setState(() {
+                showAbout = true;
+              });
+            },
+          ),
         ],
       ),
 
@@ -202,6 +211,7 @@ class _MainLayoutState extends State<MainLayout> {
         onTap: (index) {
           setState(() {
             _currentIndex = index;
+            showAbout = false;
           });
           if (index == 2) {
             mapKey.currentState?.fetchNearbyComplaints();

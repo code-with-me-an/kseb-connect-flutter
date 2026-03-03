@@ -19,59 +19,217 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
     super.initState();
     fetchComplaints();
   }
-  Future<void> deleteComplaint(String complaintId) async {
-  try {
-    await supabase
-        .from('complaints')
-        .delete()
-        .eq('tracking_code', complaintId);
 
-    // Remove from local list instantly (better UX)
-    setState(() {
-      complaints.removeWhere(
-          (complaint) => complaint['tracking_code'] == complaintId);
-    });
+  Widget _buildStep(int index, int currentStep, String text) {
+    Color circleColor;
+    Widget? icon;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Complaint deleted successfully"),
-        backgroundColor: Colors.green,
-      ),
-    );
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("Failed to delete complaint: $e"),
-        backgroundColor: Colors.red,
-      ),
-    );
-  }
-}
-void confirmDelete(String complaintId) {
-  showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text("Delete Complaint"),
-      content: const Text("Are you sure you want to delete this complaint?"),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text("Cancel"),
+    if (index < currentStep) {
+      circleColor = Colors.green;
+      icon = const Icon(Icons.check, size: 14, color: Colors.white);
+    } else if (index == currentStep) {
+      circleColor = Colors.blue;
+      icon = const Icon(Icons.check, size: 14, color: Colors.white);
+    } else {
+      circleColor = Colors.grey[300]!;
+    }
+
+    return Column(
+      children: [
+        Container(
+          width: 22,
+          height: 22,
+          decoration: BoxDecoration(color: circleColor, shape: BoxShape.circle),
+          child: icon,
         ),
-        TextButton(
-          onPressed: () {
-            Navigator.pop(context);
-            deleteComplaint(complaintId);
-          },
-          child: const Text(
-            "Delete",
-            style: TextStyle(color: Colors.red),
+        const SizedBox(height: 5),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: 10,
+            color: index <= currentStep ? circleColor : Colors.grey,
           ),
         ),
       ],
-    ),
+    );
+  }
+
+  Widget _buildLine(int index, int currentStep) {
+    Color color;
+
+    if (index < currentStep) {
+      color = Colors.green;
+    } else if (index == currentStep) {
+      color = Colors.blue;
+    } else {
+      color = Colors.grey[300]!;
+    }
+
+    return Expanded(
+      child: Container(
+        height: 3,
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        color: color,
+      ),
+    );
+  }
+
+  void showComplaintStatusDialog(Map<String, dynamic> complaint) {
+  String status = complaint['status'] ?? "";
+
+  int step = 0;
+
+  if (status == "pending") {
+    step = 1;
+  } else if (status == "in-progress") {
+    step = 2;
+  } else if (status == "resolved") {
+    step = 3;
+  }
+
+  showDialog(
+    context: context,
+    builder: (context) {
+      return Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20),
+        backgroundColor: Colors.transparent,
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.9, // proper width
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "Complaint Status",
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              /// PROGRESS BAR
+              Row(
+                children: [
+                  _buildStep(0, step, "Reported"),
+                  _buildLine(0, step),
+
+                  _buildStep(1, step, "Assigned"),
+                  _buildLine(1, step),
+
+                  _buildStep(2, step, "In Progress"),
+                  _buildLine(2, step),
+
+                  _buildStep(3, step, "Resolved"),
+                ],
+              ),
+
+              const SizedBox(height: 18),
+
+              /// INFO BOX
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.info_outline,
+                      size: 18,
+                      color: Colors.grey,
+                    ),
+
+                    const SizedBox(width: 8),
+
+                    Expanded(
+                      child: Text(
+                        "Complaint #${complaint['tracking_code']} | ${complaint['description']}",
+                        style: TextStyle(
+                          color: Colors.grey[700],
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
   );
 }
+
+  Future<void> deleteComplaint(String complaintId) async {
+    try {
+      await supabase
+          .from('complaints')
+          .delete()
+          .eq('tracking_code', complaintId);
+
+      // Remove from local list instantly (better UX)
+      setState(() {
+        complaints.removeWhere(
+          (complaint) => complaint['tracking_code'] == complaintId,
+        );
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Complaint deleted successfully"),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Failed to delete complaint: $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void confirmDelete(String complaintId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Delete Complaint"),
+        content: const Text("Are you sure you want to delete this complaint?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              deleteComplaint(complaintId);
+            },
+            child: const Text("Delete", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> fetchComplaints() async {
     if (mounted) setState(() => loading = true);
@@ -92,6 +250,37 @@ void confirmDelete(String complaintId) {
       if (mounted) {
         setState(() {
           complaints = List<Map<String, dynamic>>.from(response);
+
+          // Custom sorting
+          complaints.sort((a, b) {
+            int getPriority(String? status) {
+              switch (status) {
+                case "pending":
+                  return 0; // top
+                case "in-progress":
+                  return 1; // middle
+                case "resolved":
+                  return 2; // bottom
+                default:
+                  return 3;
+              }
+            }
+
+            int statusCompare = getPriority(
+              a['status'],
+            ).compareTo(getPriority(b['status']));
+
+            if (statusCompare != 0) {
+              return statusCompare;
+            }
+
+            // If status is same → sort by created_at (latest first)
+            DateTime dateA = DateTime.parse(a['created_at']);
+            DateTime dateB = DateTime.parse(b['created_at']);
+
+            return dateB.compareTo(dateA);
+          });
+
           loading = false;
         });
       }
@@ -136,18 +325,27 @@ void confirmDelete(String complaintId) {
                       itemBuilder: (context, index) {
                         final complaint = complaints[index];
 
-                        return ComplaintCard(
-                          onDelete: () => confirmDelete(complaint['tracking_code']),
-                          id: complaint['tracking_code'] ?? "",
-                          title: complaint['category'] ?? "",
-                          description: complaint['description'] ?? "",
-                          date: complaint['created_at'].toString().substring(
-                            0,
-                            10,
+                        return GestureDetector(
+                          onTap: () {
+                            showComplaintStatusDialog(complaint);
+                          },
+                          child: ComplaintCard(
+                            status: complaint['status'] ?? "",
+                            onDelete: () =>
+                                confirmDelete(complaint['tracking_code']),
+                            id: complaint['tracking_code'] ?? "",
+                            title: complaint['category'] ?? "",
+                            description: complaint['description'] ?? "",
+                            date: complaint['created_at'].toString().substring(
+                              0,
+                              10,
+                            ),
+                            statusLabel: complaint['status'] ?? "",
+                            statusButtonText: _formatStatus(
+                              complaint['status'],
+                            ),
+                            statusColor: _getStatusColor(complaint['status']),
                           ),
-                          statusLabel: complaint['status'] ?? "",
-                          statusButtonText: _formatStatus(complaint['status']),
-                          statusColor: _getStatusColor(complaint['status']),
                         );
                       },
                     ),
@@ -164,7 +362,7 @@ void confirmDelete(String complaintId) {
     switch (status) {
       case "pending":
         return const Color(0xFFE89020);
-      case "in_progress":
+      case "in-progress":
         return const Color(0xFF2E77AE);
       case "resolved":
         return const Color(0xFF38D52D);
@@ -184,6 +382,7 @@ class ComplaintCard extends StatelessWidget {
   final String statusButtonText; // Text inside the button
   final Color statusColor;
   final VoidCallback onDelete;
+  final String status;
 
   const ComplaintCard({
     super.key,
@@ -195,6 +394,7 @@ class ComplaintCard extends StatelessWidget {
     required this.statusButtonText,
     required this.statusColor,
     required this.onDelete,
+    required this.status,
   });
 
   @override
@@ -203,7 +403,9 @@ class ComplaintCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 20),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF9F9F9), // Very light grey fill
+        color: status == "resolved"
+            ? Colors.grey.shade300
+            : const Color(0xFFF9F9F9),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey.shade400), // Grey border
       ),
@@ -273,11 +475,11 @@ class ComplaintCard extends StatelessWidget {
           ),
 
           const SizedBox(height: 16), // A little extra breathing room
-
           // Bottom Section: Date/Status Text on Left, Delete on Right
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.center, // Aligns them perfectly horizontally
+            crossAxisAlignment:
+                CrossAxisAlignment.center, // Aligns them perfectly horizontally
             children: [
               // Left Side: Date and Small Status Label
               Text(

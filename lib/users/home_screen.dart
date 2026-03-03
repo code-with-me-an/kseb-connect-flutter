@@ -1,10 +1,9 @@
+import '../main.dart';
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:kseb_connect/providers/home_provider.dart';
 import 'report_complaint_screen.dart';
 import 'package:provider/provider.dart';
 import '../providers/user_data_provider.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,521 +13,418 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final supabase = Supabase.instance.client;
+  HomeProvider get home => context.watch<HomeProvider>();
+  UserDataProvider get userData => context.watch<UserDataProvider>();
 
-  String userName = "User";
-  bool loading = true;
-  String locationName = "Fetching location...";
-  bool locationLoading = true;
+  final ScrollController _scrollController = ScrollController();
+  double maxPullDown = 40;
+  double bottomLimit = 60;
+  bool isHolding = false;
+  bool _firstLoad = true;
+
+  static const Color backgroundWhite = Colors.white;
+  static const Color sheetGrey = Color.fromARGB(255, 231, 231, 231);
+  static const Color textDark = Colors.black87;
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(() {
+      if (!_scrollController.hasClients) return;
 
-    _fetchUserName();
-    _fetchCurrentLocationName();
+      double offset = _scrollController.offset;
+
+      // restrict pull down
+      if (offset < -maxPullDown) {
+        _scrollController.jumpTo(-maxPullDown);
+      }
+
+      // restrict bottom scroll
+      if (offset > _scrollController.position.maxScrollExtent) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      }
+    });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadUserConsumers();
+      final userId = supabase.auth.currentUser!.id;
+
+      context.read<HomeProvider>().loadHomeData();
+      context.read<UserDataProvider>().loadUserName(userId);
     });
   }
 
-  Future<void> _fetchCurrentLocationName() async {
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        setState(() {
-          locationName = "Location Disabled";
-          locationLoading = false;
-        });
-        return;
-      }
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
 
-      LocationPermission permission = await Geolocator.checkPermission();
-
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          setState(() {
-            locationName = "Permission Denied";
-            locationLoading = false;
-          });
-          return;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        setState(() {
-          locationName = "Permission Permanently Denied";
-          locationLoading = false;
-        });
-        return;
-      }
-
-      Position position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 10),
-        ),
-      );
-
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
-
-      if (placemarks.isNotEmpty) {
-        final place = placemarks.first;
-
-        setState(() {
-          locationName =
-              place.locality ??
-              place.subLocality ??
-              place.administrativeArea ??
-              "Unknown Location";
-          locationLoading = false;
-        });
-      } else {
-        setState(() {
-          locationName = "Unknown Location";
-          locationLoading = false;
-        });
-      }
-    } catch (e) {
-      debugPrint("LOCATION ERROR: $e");
-      setState(() {
-        locationName = "Location Error";
-        locationLoading = false;
-      });
+    if (_firstLoad) {
+      context.read<HomeProvider>().loadHomeData();
+      _firstLoad = false;
     }
   }
 
-  Future<void> _loadUserConsumers() async {
-    final user = supabase.auth.currentUser;
-
-    if (user == null) return;
-    final provider = context.read<UserDataProvider>();
-    if (provider.consumerConnections.isEmpty) {
-      await provider.loadConsumers(user.id);
-    }
-  }
-
-  Future<void> _fetchUserName() async {
-    final user = supabase.auth.currentUser;
-
-    if (user == null) {
-      if (mounted) setState(() => loading = false);
-      return;
-    }
-
-    try {
-      final response = await supabase
-          .from('users')
-          .select('name')
-          .eq('id', user.id)
-          .maybeSingle();
-
-      if (response != null) {
-        if (mounted) {
-          setState(() {
-            userName = response['name'] ?? "User";
-            loading = false;
-          });
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            userName = "User";
-            loading = false;
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint('Error fetching user name: $e');
-      if (mounted) {
-        setState(() {
-          userName = "User";
-          loading = false;
-        });
-      }
-
-      ScaffoldMessenger.of(
-        // ignore: use_build_context_synchronously
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error loading profile: $e')));
-    }
-  }
-
+  // --- UI DESIGN ---
   @override
   Widget build(BuildContext context) {
-    const backgroundGrey = Color(0xFFF2F2F2);
+    if (home.loading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     const orangeColor = Color(0xFFE85842); // For Report Button
+    double headerRevealHeight = 200;
 
     return Scaffold(
-      backgroundColor: backgroundGrey,
-      // --- Body ---
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 1. Location Text
-            Center(
-              child: Text(
-                "Location: $locationName",
-                style: const TextStyle(
-                  color: Colors.grey,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
+      backgroundColor: backgroundWhite,
+      body: Stack(
+        children: [
+          // 1. BACKGROUND HEADER (Fixed in place, White Background, Dark Text)
+          // 1. BACKGROUND HEADER WITH IMAGE
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              height: 265,
+              decoration: const BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage("assets/power_bg.jpg"),
+                  fit: BoxFit.cover,
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-
-            // 2. Welcome Card (Worker Illustration)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    // ignore: deprecated_member_use
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        loading
-                            ? const CircularProgressIndicator()
-                            : Text(
-                                "Welcome, $userName",
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-
-                        const SizedBox(height: 8),
-                        RichText(
-                          text: const TextSpan(
-                            text: "You have ",
-                            style: TextStyle(
-                              color: Colors.black54,
-                              fontSize: 14,
-                            ),
-                            children: [
-                              TextSpan(
-                                text: "2 active complaints",
-                                style: TextStyle(
-                                  color: Colors.green,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.assignment_ind_outlined,
-                              size: 16,
-                              color: Colors.blue[700],
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              "Last update: Officer assigned",
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.blue[700],
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Placeholder for the Cartoon Worker Image
-                  // Using a network image or icon to simulate the design
-                  SizedBox(
-                    height: 100,
-                    width: 80,
-                    child: Image.network(
-                      'https://cdn-icons-png.flaticon.com/512/3048/3048122.png', // Generic worker icon
-                      fit: BoxFit.contain,
-                      errorBuilder: (c, o, s) => const Icon(
-                        Icons.engineering,
-                        size: 60,
-                        color: Colors.orange,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // 3. Latest Complaint Status (Tracker)
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "Latest Complaint Status",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 20),
-                  // The Progress Bar
-                  Row(
-                    children: [
-                      _buildStep(true, "Reported", Colors.green),
-                      _buildLine(true),
-                      _buildStep(true, "Assigned", Colors.green),
-                      _buildLine(
-                        true,
-                        isHalf: true,
-                      ), // Half colored for "In Progress"
-                      _buildStep(
-                        true,
-                        "In Progress",
-                        Colors.blue,
-                      ), // Active step
-                      _buildLine(false),
-                      _buildStep(false, "Resolved", Colors.grey),
+              child: Container(
+                padding: const EdgeInsets.only(top: 35, left: 18, right: 18),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.black.withOpacity(0.55),
+                      Colors.black.withOpacity(0.25),
+                      Colors.transparent,
                     ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  const SizedBox(height: 15),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.info_outline,
-                          size: 16,
-                          color: Colors.grey,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            "Complaint #2515 | Power outage in your area",
-                            style: TextStyle(
-                              color: Colors.grey[700],
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // 4. BIG REPORT BUTTON
-            SizedBox(
-              width: double.infinity,
-              height: 60,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: orangeColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  elevation: 5,
-                  shadowColor: orangeColor.withOpacity(0.4),
                 ),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const ReportComplaintScreen(),
-                    ),
-                  );
-                },
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(Icons.favorite, color: orangeColor, size: 18),
-                    ),
-                    const SizedBox(width: 15),
-                    const Text(
-                      "Report Complaint",
-                      style: TextStyle(
-                        fontSize: 18,
+                    // Welcome Text
+                    Text(
+                      "Welcome, ${userData.userName}",
+                      style: const TextStyle(
+                        fontSize: 22,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // Location
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on,
+                          size: 16,
+                          color: Colors.white70,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            home.locationName,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.white70,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 18),
+
+                    // Active Complaints Badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.85),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        "2 Active Complaints",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 6),
+
+                    const Text(
+                      "Last update: Officer assigned",
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
                 ),
               ),
             ),
+          ),
 
-            const SizedBox(height: 25),
-
-            // 5. Alerts / Announcements
-            const Row(
-              children: [
-                Icon(Icons.campaign, color: Colors.orange, size: 24),
-                SizedBox(width: 10),
-                Text(
-                  "Alerts / Announcements",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const SizedBox(height: 15),
-
-            // Alert 1 (Yellow)
-            _buildAlertCard(
-              color: const Color(0xFFFFF8E1), // Light Yellow
-              icon: Icons.warning_amber_rounded,
-              iconColor: Colors.amber[800]!,
-              text: "Power shutdown today at 3 PM in Westhill",
-              badgeText: "High Priority",
-              badgeColor: Colors.orange[100]!,
-              badgeTextColor: Colors.orange[800]!,
-            ),
-
-            const SizedBox(height: 10),
-
-            // Alert 2 (Blue)
-            _buildAlertCard(
-              color: const Color(0xFFE3F2FD), // Light Blue
-              icon: Icons.info_outline,
-              iconColor: Colors.blue[800]!,
-              text: "Scheduled maintenance tomorrow at 10 AM by KSEB",
-              badgeText: "900 m",
-              badgeColor: Colors.white,
-              badgeTextColor: Colors.grey,
-            ),
-
-            const SizedBox(height: 25),
-
-            // 6. Issues Near You
-            const Row(
-              children: [
-                Icon(Icons.location_on, color: Colors.green, size: 24),
-                SizedBox(width: 10),
-                Text(
-                  "Issues Near You",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const SizedBox(height: 15),
-
-            // Issue List
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
+          // 2. FOREGROUND SCROLLABLE SHEET (Overwrites background when scrolled)
+          Positioned.fill(
+            child: SingleChildScrollView(
+              controller: _scrollController,
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
               ),
               child: Column(
                 children: [
-                  _buildIssueItem(
-                    "Power outage on Sunset Ave",
-                    "1.2 km",
-                    isLast: false,
-                  ),
-                  _buildIssueItem(
-                    "Transformer issue at Green St",
-                    "900 m",
-                    isLast: true,
+                  // This invisible box creates the gap so you can see the white header behind it
+                  SizedBox(height: headerRevealHeight),
+
+                  // The Main Content Container
+                  Container(
+                    width: double.infinity,
+                    // Ensures the sheet reaches the bottom of the screen
+                    constraints: BoxConstraints(
+                      minHeight:
+                          MediaQuery.of(context).size.height -
+                          headerRevealHeight,
+                    ),
+                    decoration: BoxDecoration(
+                      color: sheetGrey,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(30),
+                        topRight: Radius.circular(30),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                          offset: const Offset(
+                            0,
+                            -5,
+                          ), // Shadow pointing upwards
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Small handle indicator at the top of the sheet
+                        GestureDetector(
+                          onTapDown: (_) {
+                            setState(() {
+                              isHolding = true;
+                            });
+                          },
+                          onTapUp: (_) {
+                            setState(() {
+                              isHolding = false;
+                            });
+                          },
+                          onTapCancel: () {
+                            setState(() {
+                              isHolding = false;
+                            });
+                          },
+                          child: Center(
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              width: isHolding ? 70 : 40,
+                              height: 5,
+                              margin: const EdgeInsets.only(bottom: 25),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade400,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        // --- REPORT BUTTON ---
+                        SizedBox(
+                          width: double.infinity,
+                          height: 60,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: orangeColor,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                              elevation: 5,
+                              shadowColor: orangeColor.withOpacity(0.4),
+                            ),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const ReportComplaintScreen(),
+                                ),
+                              );
+                            },
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.report_problem,
+                                    color: orangeColor,
+                                    size: 18,
+                                  ),
+                                ),
+                                const SizedBox(width: 15),
+                                const Text(
+                                  "Report a New Complaint",
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 35),
+
+                        // --- ALERTS & ANNOUNCEMENTS ---
+                        const Row(
+                          children: [
+                            Icon(
+                              Icons.campaign,
+                              color: Colors.orange,
+                              size: 24,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              "Alerts & Announcements",
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: textDark,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+
+                        home.loading
+                            ? const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(20.0),
+                                  child: CircularProgressIndicator(),
+                                ),
+                              )
+                            : home.notifications.isEmpty
+                            ? const Text(
+                                "No announcements",
+                                style: TextStyle(color: Colors.grey),
+                              )
+                            : Column(
+                                children: home.notifications.map((notif) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: _buildAlertCard(
+                                      icon: Icons.info_outline,
+                                      iconColor: Colors.blue.shade700,
+                                      title: "Notification",
+                                      text: notif['message'] ?? '',
+                                      date: "Today",
+                                      badgeText: "NEW",
+                                      badgeColor: Colors.orange.shade100,
+                                      badgeTextColor: Colors.orange.shade800,
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+
+                        const SizedBox(height: 25),
+
+                        // --- ISSUES NEAR YOU ---
+                        const Row(
+                          children: [
+                            Icon(
+                              Icons.location_on,
+                              color: Colors.green,
+                              size: 24,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              "Issues Near You",
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: textDark,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Static Issue List matching design
+                        Column(
+                          children: [
+                            _buildIssueItem(
+                              title: "Power Outage",
+                              location: "East Hill",
+                              status: "In Progress",
+                              distance: "1.2 km away",
+                              statusColor: Colors.blue.shade700,
+                              iconContainerColor: Colors.orange.shade50,
+                              iconColor: Colors.orange,
+                            ),
+                            _buildIssueItem(
+                              title: "Street Light Failure",
+                              location: "Nadakkavu",
+                              status: "Assigned",
+                              distance: "0.8 km away",
+                              statusColor: Colors.green.shade600,
+                              iconContainerColor: Colors.orange.shade50,
+                              iconColor: Colors.orange,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(
+                          height: 40,
+                        ), // Extra bottom padding for scroll
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   // --- Helper Widgets ---
 
-  // 1. Progress Step (Dot + Label)
-  Widget _buildStep(bool isActive, String label, Color color) {
-    return Column(
-      children: [
-        CircleAvatar(
-          radius: 8,
-          backgroundColor: isActive ? color : Colors.grey[300],
-          child: isActive
-              ? const Icon(Icons.check, size: 10, color: Colors.white)
-              : null,
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 10,
-            color: isActive ? Colors.black87 : Colors.grey,
-            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-      ],
-    );
-  }
-
-  // 2. Progress Line
-  Widget _buildLine(bool isActive, {bool isHalf = false}) {
-    return Expanded(
-      child: Container(
-        height: 3,
-        margin: const EdgeInsets.only(bottom: 14), // Align with dots
-        decoration: BoxDecoration(
-          gradient: isHalf
-              ? const LinearGradient(colors: [Colors.green, Colors.blue])
-              : null,
-          color: isHalf ? null : (isActive ? Colors.green : Colors.grey[300]),
-        ),
-      ),
-    );
-  }
-
-  // 3. Alert Card
   Widget _buildAlertCard({
-    required Color color,
     required IconData icon,
     required Color iconColor,
+    required String title,
     required String text,
+    required String date,
     required String badgeText,
     required Color badgeColor,
     required Color badgeTextColor,
@@ -536,42 +432,80 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: iconColor, size: 24),
+          Icon(icon, color: iconColor, size: 28),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        if (badgeText.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: badgeColor,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              badgeText,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: badgeTextColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    Text(
+                      date,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
                 Text(
                   text,
                   style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
                     color: Colors.black87,
+                    height: 1.4,
                   ),
                 ),
               ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: badgeColor,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              badgeText,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: badgeTextColor,
-              ),
             ),
           ),
         ],
@@ -579,42 +513,100 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 4. Issue List Item
-  Widget _buildIssueItem(String text, String distance, {required bool isLast}) {
+  Widget _buildIssueItem({
+    required String title,
+    required String location,
+    required String status,
+    required String distance,
+    required Color statusColor,
+    required Color iconContainerColor,
+    required Color iconColor,
+  }) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        border: isLast
-            ? null
-            : Border(bottom: BorderSide(color: Colors.grey.shade200)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(6),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.red[50],
-              shape: BoxShape.circle,
+              color: iconContainerColor,
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(
-              Icons.warning_amber_rounded,
-              color: Colors.red,
-              size: 18,
-            ),
+            child: Icon(Icons.domain, color: iconColor, size: 20),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  location,
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                ),
+              ],
             ),
           ),
-          Text(
-            distance,
-            style: const TextStyle(color: Colors.grey, fontSize: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: statusColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  status,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                distance,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 }
