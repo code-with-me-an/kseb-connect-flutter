@@ -71,7 +71,8 @@ flutter:
     - assets/logo.png
     - assets/marker.svg
     - assets/profile.svg
-
+    - assets/communityicon.svg
+    - assets/personalicon.svg
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 

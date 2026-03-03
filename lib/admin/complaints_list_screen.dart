@@ -39,7 +39,7 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
       officerSectionId = officer['section_id'];
 
       await _fetchCommunityComplaints();
-
+      await _fetchPersonalComplaints();
       _listenToRealtime();
     } catch (e) {
       if (mounted) {
@@ -69,6 +69,10 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
     .eq('complaint_type', 'community')
     .order('upvote_count', ascending: false)
     .order('created_at', ascending: false);
+//for debug....remove cheyyanam
+      print("Fetched complaints:");
+    print(response);
+
       if (mounted) {
         setState(() {
           communityComplaints = List<Map<String, dynamic>>.from(response);
@@ -92,6 +96,42 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
       );
     }
   }
+  Future<void> _fetchPersonalComplaints() async {
+  if (officerSectionId == null) return;
+
+  if (mounted) setState(() => loading = true);
+
+  try {
+    final response = await supabase
+        .from('complaints')
+        .select()
+        .eq('section_id', officerSectionId!)
+        .eq('complaint_type', 'personal')
+        .order('created_at', ascending: true);
+
+    if (mounted) {
+      setState(() {
+        personalComplaints = List<Map<String, dynamic>>.from(response);
+        loading = false;
+      });
+    }
+  } catch (e) {
+    if (mounted) {
+      setState(() {
+        personalComplaints = [];
+        loading = false;
+      });
+    }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Error loading personal complaints: $e'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+}
 
   void _listenToRealtime() {
   try {
@@ -107,11 +147,16 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
 
             final newRecord = payload.newRecord;
 
-            if (newRecord != null &&
-                newRecord['section_id'] == officerSectionId &&
-                newRecord['complaint_type'] == 'community') {
-              _fetchCommunityComplaints();
-            }
+           if (newRecord != null &&
+    newRecord['section_id'] == officerSectionId) {
+
+  if (newRecord['complaint_type'] == 'community') {
+    _fetchCommunityComplaints();
+  } 
+  else if (newRecord['complaint_type'] == 'personal') {
+    _fetchPersonalComplaints();
+  }
+}
           },
         )
         .subscribe();
@@ -141,7 +186,7 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
   List<Map<String, dynamic>> communityComplaints = [];
   String? officerSectionId;
   bool loading = true;
-
+  List<Map<String, dynamic>> personalComplaints = [];
   @override
   Widget build(BuildContext context) {
     const adminThemeColor = Color(0xFF219869);
@@ -238,11 +283,13 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
               color: backgroundGrey,
               child: RefreshIndicator(
                 color: const Color(0xFF219869),
-                onRefresh: () async {
-                  if (isCommunitySelected) {
-                    await _fetchCommunityComplaints();
-                  }
-                },
+             onRefresh: () async {
+  if (isCommunitySelected) {
+    await _fetchCommunityComplaints();
+  } else {
+    await _fetchPersonalComplaints();
+  }
+},
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(20),
@@ -283,38 +330,25 @@ int upvoteCount = complaint['upvote_count'] ?? 0;
   }
 
   // --- 2. Personal Complaints List ---
-  List<Widget> _buildPersonalList(Color themeColor) {
-    return [
-      _buildComplaintCard(
-        title: "Complaint ID: #1023",
-        subtitle: "Issue: Voltage Issue",
-        detail: null, // Personal complaints might not have 'count'
-        status: "Pending",
-        themeColor: themeColor,
-      ),
-      _buildComplaintCard(
-        title: "Complaint ID: #1024",
-        subtitle: "Issue: Post Broken",
-        detail: null,
-        status: "Pending",
-        themeColor: themeColor,
-      ),
-      _buildComplaintCard(
-        title: "Complaint ID: #1025",
-        subtitle: "Issue: Voltage issue",
-        detail: null,
-        status: "In-Progress",
-        themeColor: themeColor,
-      ),
-      _buildComplaintCard(
-        title: "Complaint ID: #1026",
-        subtitle: "Issue: Voltage Issue",
-        detail: null,
-        status: "Pending",
-        themeColor: themeColor,
-      ),
-    ];
+ List<Widget> _buildPersonalList(Color themeColor) {
+  if (loading) {
+    return [const Center(child: CircularProgressIndicator())];
   }
+
+  if (personalComplaints.isEmpty) {
+    return [const Center(child: Text("Nothing to show here"))];
+  }
+
+  return personalComplaints.map((complaint) {
+    return _buildComplaintCard(
+      title: "Tracking: ${complaint['tracking_code'] ?? ""}",
+      subtitle: "Issue: ${complaint['category'] ?? ""}",
+      detail: complaint['description'],
+      status: complaint['status'] ?? "Pending",
+      themeColor: themeColor,
+    );
+  }).toList();
+}
 
   // --- Helper: Complaint Card Widget ---
   Widget _buildComplaintCard({
