@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'user_login_screen.dart';
 import 'users/main_layout.dart';
 import 'admin/main_layout.dart';
+import 'package:provider/provider.dart';
+import 'providers/user_data_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,7 +16,12 @@ Future<void> main() async {
     anonKey: 'sb_publishable_XVYY0q-iNacej703cOQmqA_vZ9PBryl',
   );
 
-  runApp(const MyApp());
+  runApp(
+    MultiProvider(
+      providers: [ChangeNotifierProvider(create: (_) => UserDataProvider())],
+      child: const MyApp(),
+    ),
+  );
 }
 
 // Global Supabase client
@@ -44,8 +51,7 @@ class _MyAppState extends State<MyApp> {
 
     /// 🔹 USER SESSION CHECK
     final keepSignedIn = prefs.getBool('keepSignedIn') ?? false;
-    final userLoggedIn =
-        keepSignedIn && supabase.auth.currentUser != null;
+    final userLoggedIn = keepSignedIn && supabase.auth.currentUser != null;
 
     if (isAdminLoggedIn) {
       _startScreen = const AdminLayout();
@@ -62,10 +68,9 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: _startScreen ??
-          const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          ),
+      home:
+          _startScreen ??
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
     );
   }
 }

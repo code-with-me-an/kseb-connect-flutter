@@ -137,13 +137,14 @@ class NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
         'user_id': user.id,
         'complaint_id': complaintId,
       });
-
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text("Upvoted successfully")));
 
       fetchNearbyComplaints(); // Refresh list
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("You already upvoted this complaint")),
       );
@@ -164,7 +165,8 @@ class NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
                   mapController: _mapController,
                   options: MapOptions(
                     initialZoom: 10.0,
-                    onTap: (_, __) =>
+                    minZoom: 7.0,
+                    onTap: (_, _) =>
                         setState(() => _selectedMarkerIndex = null),
                     onMapReady: () {
                       _moveToCurrentLocation();
@@ -227,8 +229,8 @@ class NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
             right: 20,
             child: FloatingActionButton(
               backgroundColor: Colors.white,
-              child: const Icon(Icons.my_location, color: Colors.black87),
               onPressed: _moveToCurrentLocation,
+              child: const Icon(Icons.my_location, color: Colors.black87),
             ),
           ),
 

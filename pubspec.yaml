@@ -43,6 +43,8 @@ dependencies:
   flutter_map_location_marker: ^10.2.0 
   geolocator: ^14.0.2
   shared_preferences: ^2.5.4
+  provider: ^6.1.5+1
+  geocoding: ^4.0.0
 
 dev_dependencies:
   flutter_test:
@@ -54,6 +56,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -73,6 +76,9 @@ flutter:
     - assets/profile.svg
     - assets/communityicon.svg
     - assets/personalicon.svg
+    - assets/app_icon.png
+
+
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 
@@ -99,3 +105,9 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
 # ... (rest of your file)
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: false
+  image_path: "assets/app_icon.png"
+  min_sdk_android: 21 # Required for newer Flutter versions

@@ -96,6 +96,7 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
       );
     }
   }
+
   Future<void> _fetchPersonalComplaints() async {
   if (officerSectionId == null) return;
 
@@ -123,12 +124,8 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
       });
     }
 
-    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Error loading personal complaints: $e'),
-        backgroundColor: Colors.red,
-      ),
+      SnackBar(content: Text("Error loading personal complaints: $e")),
     );
   }
 }
@@ -179,14 +176,14 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
   } catch (e) {
     // Silent fail
   }
-}
+ }
 
   final supabase = Supabase.instance.client;
 
   List<Map<String, dynamic>> communityComplaints = [];
+  List<Map<String, dynamic>> personalComplaints = [];
   String? officerSectionId;
   bool loading = true;
-  List<Map<String, dynamic>> personalComplaints = [];
   @override
   Widget build(BuildContext context) {
     const adminThemeColor = Color(0xFF219869);
@@ -283,13 +280,15 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
               color: backgroundGrey,
               child: RefreshIndicator(
                 color: const Color(0xFF219869),
-             onRefresh: () async {
-  if (isCommunitySelected) {
-    await _fetchCommunityComplaints();
-  } else {
-    await _fetchPersonalComplaints();
-  }
-},
+                onRefresh: () async {
+                  if (isCommunitySelected) {
+                    await _fetchCommunityComplaints();
+                  }
+                  else 
+                  {
+                    await _fetchPersonalComplaints();
+                  }
+                },
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(20),
@@ -320,6 +319,7 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
 int upvoteCount = complaint['upvote_count'] ?? 0;
 
   return _buildComplaintCard(
+    complaintId: complaint['complaint_id'],
     title: "Tracking: ${complaint['tracking_code'] ?? ""}",
     subtitle: "Issue: ${complaint['category'] ?? ""}",
     detail: "${complaint['description']}\n\nUpvotes: $upvoteCount",
@@ -330,17 +330,19 @@ int upvoteCount = complaint['upvote_count'] ?? 0;
   }
 
   // --- 2. Personal Complaints List ---
- List<Widget> _buildPersonalList(Color themeColor) {
+  List<Widget> _buildPersonalList(Color themeColor) {
+
   if (loading) {
     return [const Center(child: CircularProgressIndicator())];
   }
 
   if (personalComplaints.isEmpty) {
-    return [const Center(child: Text("Nothing to show here"))];
+    return [const Center(child: Text("No personal complaints found"))];
   }
 
   return personalComplaints.map((complaint) {
     return _buildComplaintCard(
+      complaintId: complaint['complaint_id'],
       title: "Tracking: ${complaint['tracking_code'] ?? ""}",
       subtitle: "Issue: ${complaint['category'] ?? ""}",
       detail: complaint['description'],
@@ -352,6 +354,7 @@ int upvoteCount = complaint['upvote_count'] ?? 0;
 
   // --- Helper: Complaint Card Widget ---
   Widget _buildComplaintCard({
+    required String complaintId,
     required String title,
     required String subtitle,
     String? detail,
@@ -387,28 +390,36 @@ int upvoteCount = complaint['upvote_count'] ?? 0;
                   color: Colors.black87,
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: themeColor,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Row(
-                  children: const [
-                    Icon(Icons.edit, color: Colors.white, size: 14),
-                    SizedBox(width: 4),
-                    Text(
-                      "Edit",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
+              GestureDetector(
+                onTap: () {
+                  _showStatusDialog(
+                    complaintId: complaintId,
+                    currentStatus: status,
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: themeColor,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Row(
+                    children: const [
+                      Icon(Icons.edit, color: Colors.white, size: 14),
+                      SizedBox(width: 4),
+                      Text(
+                        "Edit",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -442,7 +453,89 @@ int upvoteCount = complaint['upvote_count'] ?? 0;
       ),
     );
   }
-  @override
+ 
+
+  Future<void> _showStatusDialog({
+    required String complaintId,
+    required String currentStatus,
+  }) async {
+    String selectedStatus = currentStatus;
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Update Status"),
+          content: DropdownButtonFormField<String>(
+            value: selectedStatus,
+            items: const [
+              DropdownMenuItem(value: "pending", child: Text("Pending")),
+              DropdownMenuItem(
+                value: "in-progress",
+                child: Text("In-Progress"),
+              ),
+              DropdownMenuItem(value: "resolved", child: Text("Resolved")),
+            ],
+            onChanged: (value) {
+              selectedStatus = value!;
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                await _updateComplaintStatus(complaintId, selectedStatus);
+                Navigator.pop(context);
+              },
+              child: const Text("Update"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _updateComplaintStatus(
+    String complaintId,
+    String newStatus,
+  ) async {
+    try {
+      // 1️⃣ Update complaint status
+      await supabase
+          .from('complaints')
+          .update({'status': newStatus})
+          .eq('complaint_id', complaintId);
+
+      // 2️⃣ Get complaint owner
+      final complaint = await supabase
+          .from('complaints')
+          .select('user_id')
+          .eq('complaint_id', complaintId)
+          .single();
+
+      final ownerId = complaint['user_id'];
+
+      // 3️⃣ Create notification
+      await supabase.from('notifications').insert({
+        'complaint_id': complaintId,
+        'user_id': ownerId,
+        'recipient_type': 'user',
+        'title': 'Complaint Status Updated',
+        'message': 'Your complaint status is now $newStatus',
+      });
+
+      _fetchCommunityComplaints();
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error: $e")));
+    }
+  }
+  
+   @override
 void dispose() {
   supabase.removeAllChannels();
   super.dispose();
