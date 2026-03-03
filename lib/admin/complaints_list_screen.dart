@@ -3,7 +3,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ComplaintsListScreen extends StatefulWidget {
-  const ComplaintsListScreen({super.key});
+  final String? highlightComplaintId;
+  final String? highlightComplaintType;
+
+ const ComplaintsListScreen({
+  super.key,
+  this.highlightComplaintId,
+  this.highlightComplaintType,
+});
 
   @override
   State<ComplaintsListScreen> createState() => _ComplaintsListScreenState();
@@ -13,11 +20,18 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
   // Toggle State: true = Community, false = Personal
   bool isCommunitySelected = true;
 
-  @override
-  void initState() {
-    super.initState();
-    _initialize();
+ @override
+void initState() {
+  super.initState();
+
+  if (widget.highlightComplaintType == 'personal') {
+    isCommunitySelected = false;
+  } else {
+    isCommunitySelected = true;
   }
+
+  _initialize();
+}
 
   Future<void> _initialize() async {
     final prefs = await SharedPreferences.getInstance();
@@ -78,6 +92,8 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
           communityComplaints = List<Map<String, dynamic>>.from(response);
           loading = false;
         });
+
+      _scrollToHighlightedComplaint(communityComplaints);
       }
     } catch (e) {
       if (mounted) {
@@ -111,10 +127,12 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
           .order('created_at', ascending: true);
 
       if (mounted) {
-        setState(() {
-          personalComplaints = List<Map<String, dynamic>>.from(response);
-          loading = false;
-        });
+       setState(() {
+  personalComplaints = List<Map<String, dynamic>>.from(response);
+  loading = false;
+});
+
+_scrollToHighlightedComplaint(personalComplaints);
       }
     } catch (e) {
       if (mounted) {
@@ -129,6 +147,23 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
       );
     }
   }
+  void _scrollToHighlightedComplaint(List<Map<String, dynamic>> complaints) {
+  if (widget.highlightComplaintId == null) return;
+
+  final index = complaints.indexWhere(
+    (c) => c['complaint_id'] == widget.highlightComplaintId,
+  );
+
+  if (index != -1) {
+    Future.delayed(const Duration(milliseconds: 400), () {
+      _scrollController.animateTo(
+        index * 130,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    });
+  }
+}
 
   void _listenToRealtime() {
   try {
@@ -168,6 +203,7 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
   List<Map<String, dynamic>> personalComplaints = [];
   String? officerSectionId;
   bool loading = true;
+  final ScrollController _scrollController = ScrollController();
   @override
   Widget build(BuildContext context) {
     const adminThemeColor = Color(0xFF219869);
@@ -272,6 +308,7 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
                   }
                 },
                 child: ListView(
+                  controller: _scrollController,
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(20),
                   children: isCommunitySelected
@@ -306,6 +343,7 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
         detail: "${complaint['description']}\n\nUpvotes: $upvoteCount",
         status: complaint['status'] ?? "Pending",
         themeColor: themeColor,
+        highlight: widget.highlightComplaintId == complaint['complaint_id'],
       );
     }).toList();
   }
@@ -328,6 +366,7 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
         detail: complaint['description'],
         status: complaint['status'] ?? "Pending",
         themeColor: themeColor,
+        highlight: widget.highlightComplaintId == complaint['complaint_id'],
       );
     }).toList();
   }
@@ -340,13 +379,17 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
     String? detail,
     required String status,
     required Color themeColor,
+    bool highlight = false
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        color: highlight ? Colors.yellow[100] : Colors.white,
+  borderRadius: BorderRadius.circular(12),
+  border: highlight
+      ? Border.all(color: Colors.orange, width: 2)
+      : null,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
