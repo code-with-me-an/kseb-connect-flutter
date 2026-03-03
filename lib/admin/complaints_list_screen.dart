@@ -40,10 +40,6 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
 
       await _fetchCommunityComplaints();
       await _fetchPersonalComplaints();
-<<<<<<< HEAD
-
-=======
->>>>>>> admincomplaints
       _listenToRealtime();
     } catch (e) {
       if (mounted) {
@@ -137,39 +133,6 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
   }
 }
 
-  Future<void> _fetchPersonalComplaints() async {
-  if (officerSectionId == null) return;
-
-  if (mounted) setState(() => loading = true);
-
-  try {
-    final response = await supabase
-        .from('complaints')
-        .select()
-        .eq('section_id', officerSectionId!)
-        .eq('complaint_type', 'personal')
-        .order('created_at', ascending: true);
-
-    if (mounted) {
-      setState(() {
-        personalComplaints = List<Map<String, dynamic>>.from(response);
-        loading = false;
-      });
-    }
-  } catch (e) {
-    if (mounted) {
-      setState(() {
-        personalComplaints = [];
-        loading = false;
-      });
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Error loading personal complaints: $e")),
-    );
-  }
-}
-
 void _listenToRealtime() {
   try {
     // Listen for complaint changes
@@ -193,7 +156,7 @@ void _listenToRealtime() {
   else if (newRecord['complaint_type'] == 'personal') {
     _fetchPersonalComplaints();
   }
-}
+       }
           },
         )
         .subscribe();
@@ -225,7 +188,6 @@ void _listenToRealtime() {
   List<Map<String, dynamic>> personalComplaints = [];
   String? officerSectionId;
   bool loading = true;
-  List<Map<String, dynamic>> personalComplaints = [];
   @override
   Widget build(BuildContext context) {
     const adminThemeColor = Color(0xFF219869);
@@ -368,7 +330,7 @@ return communityComplaints.map((complaint) {
     themeColor: themeColor,
   );
 }).toList();
-
+  }
 
   // --- 2. Personal Complaints List ---
   List<Widget> _buildPersonalList(Color themeColor) {
