@@ -39,6 +39,7 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
       officerSectionId = officer['section_id'];
 
       await _fetchCommunityComplaints();
+      await _fetchPersonalComplaints();
 
       _listenToRealtime();
     } catch (e) {
@@ -93,6 +94,39 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
     }
   }
 
+  Future<void> _fetchPersonalComplaints() async {
+  if (officerSectionId == null) return;
+
+  if (mounted) setState(() => loading = true);
+
+  try {
+    final response = await supabase
+        .from('complaints')
+        .select()
+        .eq('section_id', officerSectionId!)
+        .eq('complaint_type', 'personal')
+        .order('created_at', ascending: true);
+
+    if (mounted) {
+      setState(() {
+        personalComplaints = List<Map<String, dynamic>>.from(response);
+        loading = false;
+      });
+    }
+  } catch (e) {
+    if (mounted) {
+      setState(() {
+        personalComplaints = [];
+        loading = false;
+      });
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Error loading personal complaints: $e")),
+    );
+  }
+}
+
   void _listenToRealtime() {
     try {
       supabase
@@ -115,12 +149,13 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
           .subscribe();
     } catch (e) {
       // Handle error silently
+    }
   }
-}
 
   final supabase = Supabase.instance.client;
 
   List<Map<String, dynamic>> communityComplaints = [];
+  List<Map<String, dynamic>> personalComplaints = [];
   String? officerSectionId;
   bool loading = true;
 
@@ -224,6 +259,10 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
                   if (isCommunitySelected) {
                     await _fetchCommunityComplaints();
                   }
+                  else 
+                  {
+                    await _fetchPersonalComplaints();
+                  }
                 },
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
@@ -252,6 +291,7 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
 
     return communityComplaints.map((complaint) {
       return _buildComplaintCard(
+        complaintId: complaint['complaint_id'],
         title: "Tracking: ${complaint['tracking_code'] ?? ""}",
         subtitle: "Issue: ${complaint['category'] ?? ""}",
         detail: complaint['description'],
@@ -263,40 +303,29 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
 
   // --- 2. Personal Complaints List ---
   List<Widget> _buildPersonalList(Color themeColor) {
-    return [
-      _buildComplaintCard(
-        title: "Complaint ID: #1023",
-        subtitle: "Issue: Voltage Issue",
-        detail: null, // Personal complaints might not have 'count'
-        status: "Pending",
-        themeColor: themeColor,
-      ),
-      _buildComplaintCard(
-        title: "Complaint ID: #1024",
-        subtitle: "Issue: Post Broken",
-        detail: null,
-        status: "Pending",
-        themeColor: themeColor,
-      ),
-      _buildComplaintCard(
-        title: "Complaint ID: #1025",
-        subtitle: "Issue: Voltage issue",
-        detail: null,
-        status: "In-Progress",
-        themeColor: themeColor,
-      ),
-      _buildComplaintCard(
-        title: "Complaint ID: #1026",
-        subtitle: "Issue: Voltage Issue",
-        detail: null,
-        status: "Pending",
-        themeColor: themeColor,
-      ),
-    ];
+  if (loading) {
+    return [const Center(child: CircularProgressIndicator())];
   }
+
+  if (personalComplaints.isEmpty) {
+    return [const Center(child: Text("No personal complaints found"))];
+  }
+
+  return personalComplaints.map((complaint) {
+    return _buildComplaintCard(
+      complaintId: complaint['complaint_id'],
+      title: "Tracking: ${complaint['tracking_code'] ?? ""}",
+      subtitle: "Issue: ${complaint['category'] ?? ""}",
+      detail: complaint['description'],
+      status: complaint['status'] ?? "Pending",
+      themeColor: themeColor,
+    );
+  }).toList();
+}
 
   // --- Helper: Complaint Card Widget ---
   Widget _buildComplaintCard({
+    required String complaintId,
     required String title,
     required String subtitle,
     String? detail,
@@ -332,28 +361,36 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
                   color: Colors.black87,
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: themeColor,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Row(
-                  children: const [
-                    Icon(Icons.edit, color: Colors.white, size: 14),
-                    SizedBox(width: 4),
-                    Text(
-                      "Edit",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
+              GestureDetector(
+                onTap: () {
+                  _showStatusDialog(
+                    complaintId: complaintId,
+                    currentStatus: status,
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: themeColor,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Row(
+                    children: const [
+                      Icon(Icons.edit, color: Colors.white, size: 14),
+                      SizedBox(width: 4),
+                      Text(
+                        "Edit",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -386,5 +423,85 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _showStatusDialog({
+    required String complaintId,
+    required String currentStatus,
+  }) async {
+    String selectedStatus = currentStatus;
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Update Status"),
+          content: DropdownButtonFormField<String>(
+            value: selectedStatus,
+            items: const [
+              DropdownMenuItem(value: "pending", child: Text("Pending")),
+              DropdownMenuItem(
+                value: "in-progress",
+                child: Text("In-Progress"),
+              ),
+              DropdownMenuItem(value: "resolved", child: Text("Resolved")),
+            ],
+            onChanged: (value) {
+              selectedStatus = value!;
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                await _updateComplaintStatus(complaintId, selectedStatus);
+                Navigator.pop(context);
+              },
+              child: const Text("Update"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _updateComplaintStatus(
+    String complaintId,
+    String newStatus,
+  ) async {
+    try {
+      // 1️⃣ Update complaint status
+      await supabase
+          .from('complaints')
+          .update({'status': newStatus})
+          .eq('complaint_id', complaintId);
+
+      // 2️⃣ Get complaint owner
+      final complaint = await supabase
+          .from('complaints')
+          .select('user_id')
+          .eq('complaint_id', complaintId)
+          .single();
+
+      final ownerId = complaint['user_id'];
+
+      // 3️⃣ Create notification
+      await supabase.from('notifications').insert({
+        'complaint_id': complaintId,
+        'user_id': ownerId,
+        'recipient_type': 'user',
+        'title': 'Complaint Status Updated',
+        'message': 'Your complaint status is now $newStatus',
+      });
+
+      _fetchCommunityComplaints();
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error: $e")));
+    }
   }
 }
