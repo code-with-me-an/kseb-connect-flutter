@@ -7,7 +7,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:flutter_map_location_marker/flutter_map_location_marker.dart'; // Ensure this is imported
+import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
+import 'package:provider/provider.dart';
+import '../providers/user_data_provider.dart';
 
 class ReportComplaintScreen extends StatefulWidget {
   const ReportComplaintScreen({super.key});
@@ -19,10 +21,8 @@ class ReportComplaintScreen extends StatefulWidget {
 class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
   final supabase = Supabase.instance.client;
 
-  List<dynamic> _consumerConnections = [];
   String? _selectedConsumerId;
   String? _selectedSectionId;
-
   String? complaintType;
   String? category;
   final TextEditingController detailsController = TextEditingController();
@@ -31,20 +31,20 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
   LatLng? _selectedLocation;
   bool _isMapLoading = true;
   bool submitting = false;
+  LatLng? _cachedLocation;
+
+  // generate unique tracking code for each complaint
 
   String generateTrackingCode() {
     final random = Random();
-
-    // Generate 3 uppercase letters
     String letters = String.fromCharCodes(
       List.generate(3, (_) => random.nextInt(26) + 65),
     );
-
-    // Generate 5 digit number (00000 - 99999)
     String numbers = random.nextInt(100000).toString().padLeft(5, '0');
-
     return letters + numbers;
   }
+
+  // Haversine distance formula to calculate distance between two lat/lng points
 
   double _calculateDistance(
     double lat1,
@@ -72,30 +72,33 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
     return deg * (pi / 180);
   }
 
+  // get nearest section office
+
   Future<void> _findNearestSection() async {
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
-
     if (_selectedLocation == null) {
-      await _getCurrentLocation();
-    }
-
-    if (_selectedLocation == null) {
-      throw Exception("Unable to get user location");
+      throw Exception("Please pin complaint location on the map.");
     }
 
     try {
-      // Fetch all section offices
+      const double radius = 0.1; // ~10 km bounding box
+
+      final lat = _selectedLocation!.latitude;
+      final lng = _selectedLocation!.longitude;
+
       final sections = await supabase
           .from('sections')
-          .select('section_id, latitude, longitude');
+          .select('section_id, latitude, longitude')
+          .gte('latitude', lat - radius)
+          .lte('latitude', lat + radius)
+          .gte('longitude', lng - radius)
+          .lte('longitude', lng + radius);
+
+      if (sections.isEmpty) {
+        throw Exception("No nearby section found.");
+      }
 
       double minDistance = double.infinity;
       String? nearestSectionId;
-      debugPrint(
-        "User Location: ${_selectedLocation?.latitude}, ${_selectedLocation?.longitude}",
-      );
-      debugPrint("Sections fetched count: ${sections.length}");
 
       for (var section in sections) {
         final sectionLat = double.tryParse(section['latitude'].toString());
@@ -103,12 +106,7 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
 
         if (sectionLat == null || sectionLon == null) continue;
 
-        double distance = _calculateDistance(
-          _selectedLocation!.latitude,
-          _selectedLocation!.longitude,
-          sectionLat,
-          sectionLon,
-        );
+        double distance = _calculateDistance(lat, lng, sectionLat, sectionLon);
 
         if (distance < minDistance) {
           minDistance = distance;
@@ -116,95 +114,64 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
         }
       }
 
-      if (nearestSectionId != null) {
+      if (nearestSectionId == null) {
+        throw Exception("Unable to assign nearest section.");
+      }
+
+      if (mounted) {
         setState(() {
           _selectedSectionId = nearestSectionId;
         });
-
-        debugPrint("Nearest Section Assigned: $nearestSectionId");
-      } else {
-        throw Exception("No section found");
       }
     } catch (e) {
-      debugPrint("Error finding nearest section: $e");
       rethrow;
     }
   }
 
-  Future<String> generateUniqueTrackingCode() async {
-    final supabase = Supabase.instance.client;
-
-    int attempts = 0;
-    while (attempts < 10) {
-      try {
-        String code = generateTrackingCode();
-
-        final existing = await supabase
-            .from('complaints')
-            .select('tracking_code')
-            .eq('tracking_code', code)
-            .maybeSingle();
-
-        if (existing == null) {
-          return code;
-        }
-
-        attempts++;
-      } catch (e) {
-        debugPrint('Error generating tracking code: $e');
-        attempts++;
-
-        if (attempts >= 10) {
-          throw Exception('Failed to generate tracking code after 10 attempts');
-        }
-      }
-    }
-
-    throw Exception('Could not generate unique tracking code');
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _getCurrentLocation();
-  }
-
   // --- 1. FIXED: Set the pin immediately when location is found ---
-  Future<void> _getCurrentLocation() async {
-    bool serviceEnabled;
-    LocationPermission permission;
+  Future<LatLng?> _getCurrentLocation() async {
+    if (_cachedLocation != null) return _cachedLocation;
 
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      if (mounted) setState(() => _isMapLoading = false);
-      return;
-    }
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return null;
 
-    permission = await Geolocator.checkPermission();
+    LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        if (mounted) setState(() => _isMapLoading = false);
-        return;
-      }
+      if (permission == LocationPermission.denied) return null;
     }
-
-    if (permission == LocationPermission.deniedForever) {
-      if (mounted) setState(() => _isMapLoading = false);
-      return;
-    }
-
+    if (permission == LocationPermission.deniedForever) return null;
     Position position = await Geolocator.getCurrentPosition();
+    final location = LatLng(position.latitude, position.longitude);
+    _cachedLocation = location;
+    setState(() {
+      _selectedLocation = location;
+      _isMapLoading = false;
+    });
+    return location;
+  }
 
-    if (mounted) {
+  Future<void> _centerToCurrentLocation() async {
+    setState(() {
+      _isMapLoading = true;
+    });
+
+    final location = await _getCurrentLocation();
+
+    if (!mounted) return;
+
+    if (location != null) {
+      setState(() {
+        _selectedLocation = location;
+        _isMapLoading = false;
+      });
+
+      _mapController.move(location, 15.0);
+    } else {
       setState(() {
         _isMapLoading = false;
-        //  This puts the Red Pin on the Blue Dot immediately
-        _selectedLocation = LatLng(position.latitude, position.longitude);
       });
     }
-
-    _mapController.move(LatLng(position.latitude, position.longitude), 15.0);
   }
 
   // ... (Keep _pickImage, uploadImage, submitComplaint same as before) ...
@@ -223,7 +190,6 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
   }
 
   Future<String?> uploadImage(File image) async {
-    final supabase = Supabase.instance.client;
     final fileName =
         'public/complaints/${DateTime.now().millisecondsSinceEpoch}.jpg';
 
@@ -249,9 +215,8 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
     double? latitude,
     double? longitude,
   }) async {
-    final supabase = Supabase.instance.client;
     final user = supabase.auth.currentUser;
-    String trackingCode = await generateUniqueTrackingCode();
+    String trackingCode = generateTrackingCode();
 
     if (user == null) throw Exception("User not logged in");
 
@@ -270,13 +235,12 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
       throw Exception("Please select a location on the map.");
     }
 
-    if (complaintType == 'community' && _selectedSectionId == null) {
+    if (complaintType == 'community') {
       await _findNearestSection();
     }
 
-    // ✅ ADD THIS: Require section for all complaints
-    if (_selectedSectionId == null || _selectedSectionId!.isEmpty) {
-      throw Exception("Please select a section for the complaint");
+    if (complaintType == 'personal' && _selectedSectionId == null) {
+      throw Exception("Please select consumer connection");
     }
 
     try {
@@ -297,111 +261,34 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
           .select()
           .single();
 
-      if (!mounted) return;
+      _showSuccessDialog(response['tracking_code']);
+    } on PostgrestException catch (e) {
+      // 🔴 UNIQUE constraint violation
+      if (e.code == '23505') {
+        // Generate new code and retry once
+        trackingCode = generateTrackingCode();
 
-      showDialog(
-        context: context,
-        builder: (_) => Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Top Icon
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFE6EEF6),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.check_circle,
-                    color: Color(0xFF0D3B66),
-                    size: 40,
-                  ),
-                ),
+        final response = await supabase
+            .from('complaints')
+            .insert({
+              'tracking_code': trackingCode,
+              'user_id': user.id,
+              'section_id': _selectedSectionId,
+              'complaint_type': complaintType,
+              'category': category,
+              'description': description,
+              'consumer_id': complaintType == 'personal' ? consumerId : null,
+              'latitude': latitude,
+              'longitude': longitude,
+              'image_url': imageUrl,
+            })
+            .select()
+            .single();
 
-                const SizedBox(height: 20),
-
-                // Title
-                const Text(
-                  "Complaint Registered",
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0D3B66),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-
-                const SizedBox(height: 15),
-
-                const Text(
-                  "Your Tracking Code",
-                  style: TextStyle(fontSize: 14, color: Colors.grey),
-                ),
-
-                const SizedBox(height: 8),
-
-                // Tracking Code Highlight
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 12,
-                    horizontal: 20,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF5F5F5),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    response['tracking_code'],
-                    style: const TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 2,
-                      color: Color(0xFF0D3B66),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 25),
-
-                // Button
-                SizedBox(
-                  width: double.infinity,
-                  height: 45,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0D3B66),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    onPressed: () {
-                      Navigator.pop(context);
-                      Navigator.pop(context);
-                    },
-                    child: const Text(
-                      "OK",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
+        _showSuccessDialog(response['tracking_code']);
+      } else {
+        rethrow;
+      }
     } catch (e) {
       debugPrint('Error submitting complaint: $e');
 
@@ -416,83 +303,98 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
     }
   }
 
-  Future<void> fetchConsumerConnections() async {
-    final user = supabase.auth.currentUser;
+  void _showSuccessDialog(String trackingCode) {
+    if (!mounted) return;
 
-    if (user == null) return;
-
-    try {
-      final response = await supabase
-          .from('consumer_connections')
-          .select()
-          .eq('user_id', user.id);
-
-      if (mounted) {
-        setState(() {
-          _consumerConnections = response;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error fetching consumer connections: $e');
-      if (mounted) {
-        setState(() {
-          _consumerConnections = [];
-        });
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading connections: $e'),
-            backgroundColor: Colors.red,
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
           ),
-        );
-      }
-    }
-  }
-
-  // ✅ NEW METHOD: Get user's default section for community complaints
-  Future<void> _fetchUserDefaultSection() async {
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
-
-    try {
-      final connections = await supabase
-          .from('consumer_connections')
-          .select('section_id')
-          .eq('user_id', user.id)
-          .limit(1);
-
-      if (connections.isNotEmpty) {
-        if (mounted) {
-          setState(() {
-            _selectedSectionId = connections[0]['section_id'].toString();
-          });
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'No section found. Please add a consumer connection.',
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFE6EEF6),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_circle,
+                  color: Color(0xFF0D3B66),
+                  size: 40,
+                ),
               ),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint('Error fetching default section: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
-      }
-    }
+              const SizedBox(height: 20),
+              const Text(
+                "Complaint Registered",
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0D3B66),
+                ),
+              ),
+              const SizedBox(height: 15),
+              const Text(
+                "Your Tracking Code",
+                style: TextStyle(fontSize: 14, color: Colors.grey),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 20,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F5F5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  trackingCode,
+                  style: const TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2,
+                    color: Color(0xFF0D3B66),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 25),
+              SizedBox(
+                width: double.infinity,
+                height: 45,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0D3B66),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    Navigator.pop(context);
+                  },
+                  child: const Text(
+                    "OK",
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final userData = context.watch<UserDataProvider>();
+    final consumers = userData.consumerConnections;
+    final isLoadingConsumers = userData.isLoading;
     const navyBlue = Color(0xFF0D3B66);
     const backgroundGrey = Color(0xFFF5F5F5);
     const uploadButtonColor = Color(0xFFFFF9F0);
@@ -522,7 +424,7 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ======================
-            // 🔥 IMPROVEMENT 1: Added Category Dropdown (Personal / Community)
+            //IMPROVEMENT 1: Added Category Dropdown (Personal / Community)
             // ======================
             _buildCustomDropdown(
               hint: "Select Category",
@@ -536,7 +438,7 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
                   setState(() {
                     category = v;
 
-                    // ✅ CHANGED: Reset section only for Personal
+                    // CHANGED: Reset section only for Personal
                     if (v == "Personal") {
                       _selectedSectionId = null;
                     }
@@ -544,11 +446,11 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
                   });
                 }
 
-                // ✅ CHANGED: Fetch connections for Personal, section for Community
+                // CHANGED: Fetch connections for Personal, section for Community
                 if (v == "Personal") {
-                  await fetchConsumerConnections();
+                  
                 } else if (v == "Community") {
-                  await _findNearestSection();
+                  await _centerToCurrentLocation();
                 }
               },
             ),
@@ -587,30 +489,35 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
             // ======================
             // 🔥 IMPROVEMENT 5: Show Consumer Dropdown ONLY if Personal
             // ======================
-            if (category == "Personal" && _consumerConnections.isNotEmpty)
-              _buildCustomDropdown(
-                hint: "Select Consumer Number",
-                value: _selectedConsumerId,
-                items: _consumerConnections.map<Map<String, String>>((e) {
-                  return {
-                    "value": e['consumer_id'].toString(),
-                    "label": e['consumer_number'].toString(),
-                  };
-                }).toList(),
-                onChanged: (val) {
-                  final selected = _consumerConnections.firstWhere(
-                    (e) => e['consumer_id'].toString() == val,
-                  );
+            if (category == "Personal") ...[
+  if (isLoadingConsumers)
+    const Center(child: CircularProgressIndicator())
+  else if (consumers.isEmpty)
+    const Text("No consumer connections found.")
+  else
+    _buildCustomDropdown(
+      hint: "Select Consumer Number",
+      value: _selectedConsumerId,
+      items: consumers.map<Map<String, String>>((e) {
+        return {
+          "value": e['consumer_id'].toString(),
+          "label": e['consumer_number'].toString(),
+        };
+      }).toList(),
+      onChanged: (val) {
+        final selected = consumers.firstWhere(
+          (e) => e['consumer_id'].toString() == val,
+        );
 
-                  if (mounted) {
-                    setState(() {
-                      _selectedConsumerId = selected['consumer_id'].toString();
-                      _selectedSectionId = selected['section_id'].toString();
-                    });
-                  }
-                },
-              ),
+        setState(() {
+          _selectedConsumerId = selected['consumer_id'].toString();
+          _selectedSectionId = selected['section_id'].toString();
+        });
+      },
+    ),
+],
 
+              
             const SizedBox(height: 15),
             Container(
               decoration: BoxDecoration(
@@ -682,113 +589,134 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
               ),
             const SizedBox(height: 20),
 
-            // --- REAL INTERACTIVE MAP ---
-            Container(
-              height: 250,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Stack(
-                  children: [
-                    _isMapLoading
-                        ? const Center(child: CircularProgressIndicator())
-                        : FlutterMap(
-                            mapController: _mapController,
-                            options: MapOptions(
-                              initialCenter: const LatLng(11.2588, 75.7804),
-                              initialZoom: 15.0,
-                              onTap: (_, latlng) {
-                                if (mounted) {
-                                  setState(() {
-                                    _selectedLocation = latlng;
-                                  });
-                                }
-                              },
-                            ),
-                            children: [
-                              TileLayer(
-                                urlTemplate:
-                                    'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-                                subdomains: const ['a', 'b', 'c'],
-                                userAgentPackageName: 'com.complaintapp.report',
-                              ),
+            // map visible only when the user click the community
+            if (category == "Community") ...[
+              const SizedBox(height: 20),
 
-                              // 2. FIXED: Added the Blue Dot Layer here!
-                              CurrentLocationLayer(
-                                style: const LocationMarkerStyle(
-                                  marker: DefaultLocationMarker(
-                                    color: Color(0xFF2196F3),
-                                    child: Icon(
-                                      Icons.navigation,
-                                      color: Colors.white,
-                                      size: 14,
+              if (_isMapLoading || _selectedLocation == null)
+                Container(
+                  height: 250,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade300),
+                    color: Colors.white,
+                  ),
+                  child: const CircularProgressIndicator(),
+                )
+              else
+                // --- REAL INTERACTIVE MAP ---
+                Container(
+                  height: 250,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Stack(
+                      children: [
+                        _isMapLoading
+                            ? const Center(child: CircularProgressIndicator())
+                            : FlutterMap(
+                                mapController: _mapController,
+                                options: MapOptions(
+                                  initialCenter: _selectedLocation!,
+                                  initialZoom: 15.0,
+                                  onTap: (_, latlng) {
+                                    if (mounted) {
+                                      setState(() {
+                                        _selectedLocation = latlng;
+                                      });
+                                    }
+                                  },
+                                ),
+                                children: [
+                                  TileLayer(
+                                    urlTemplate:
+                                        'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+                                    subdomains: const ['a', 'b', 'c'],
+                                    userAgentPackageName:
+                                        'com.complaintapp.report',
+                                  ),
+
+                                  // 2. FIXED: Added the Blue Dot Layer here!
+                                  CurrentLocationLayer(
+                                    style: const LocationMarkerStyle(
+                                      marker: DefaultLocationMarker(
+                                        color: Color(0xFF2196F3),
+                                        child: Icon(
+                                          Icons.navigation,
+                                          color: Colors.white,
+                                          size: 14,
+                                        ),
+                                      ),
+                                      markerSize: Size(20, 20),
+                                      markerDirection: MarkerDirection.heading,
                                     ),
                                   ),
-                                  markerSize: Size(20, 20),
-                                  markerDirection: MarkerDirection.heading,
-                                ),
+
+                                  if (_selectedLocation != null)
+                                    MarkerLayer(
+                                      // 3. FIXED: Ensures marker stands UP on the location
+                                      rotate: false,
+                                      alignment: Alignment.bottomCenter,
+                                      markers: [
+                                        Marker(
+                                          point: _selectedLocation!,
+                                          width: 40,
+                                          height: 40,
+                                          child: SvgPicture.asset(
+                                            'assets/marker.svg',
+                                            width: 40,
+                                            height: 40,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                ],
                               ),
 
-                              if (_selectedLocation != null)
-                                MarkerLayer(
-                                  // 3. FIXED: Ensures marker stands UP on the location
-                                  rotate: false,
-                                  alignment: Alignment.bottomCenter,
-                                  markers: [
-                                    Marker(
-                                      point: _selectedLocation!,
-                                      width: 40,
-                                      height: 40,
-                                      child: SvgPicture.asset(
-                                        'assets/marker.svg',
-                                        width: 40,
-                                        height: 40,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                            ],
-                          ),
-
-                    Positioned(
-                      top: 10,
-                      right: 10,
-                      child: InkWell(
-                        onTap: _getCurrentLocation,
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(blurRadius: 5, color: Colors.black12),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.my_location,
-                            size: 20,
-                            color: Color(0xFF0D3B66),
+                        Positioned(
+                          top: 10,
+                          right: 10,
+                          child: InkWell(
+                            onTap: _centerToCurrentLocation,
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    blurRadius: 5,
+                                    color: Colors.black12,
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.my_location,
+                                size: 20,
+                                color: Color(0xFF0D3B66),
+                              ),
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
 
-            if (_selectedLocation != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8.0, left: 4.0),
-                child: Text(
-                  "Pinned Location: ${_selectedLocation!.latitude.toStringAsFixed(4)}, ${_selectedLocation!.longitude.toStringAsFixed(4)}",
-                  style: const TextStyle(fontSize: 12, color: Colors.green),
+              if (_selectedLocation != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0, left: 4.0),
+                  child: Text(
+                    "Pinned Location: ${_selectedLocation!.latitude.toStringAsFixed(4)}, ${_selectedLocation!.longitude.toStringAsFixed(4)}",
+                    style: const TextStyle(fontSize: 12, color: Colors.green),
+                  ),
                 ),
-              ),
+            ],
 
             const SizedBox(height: 30),
 
