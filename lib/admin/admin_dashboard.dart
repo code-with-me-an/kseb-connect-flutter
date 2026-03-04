@@ -50,7 +50,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
         if (status == 'pending') {
           pending++;
-        } else if (status == 'in_progress') {
+        } else if (status == 'in-progress') {
           inProgress++;
         } else if (status == 'resolved') {
           resolved++;
