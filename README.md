@@ -64,6 +64,10 @@ flutter devices
 
 #regenerate development folder
 flutter create .
+
+#installing the app
+flutter build apk --release
+adb install build/app/outputs/flutter-apk/app-release.apk
 ```
 
 ### ADB: connect and device management (Android)
