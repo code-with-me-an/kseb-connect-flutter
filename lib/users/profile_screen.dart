@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart'; // 1. Import this
 import 'package:kseb_connect/user_login_screen.dart';
 import '../main.dart'; // supabase client
+import 'about_us_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  final VoidCallback onAboutTap;
+
+  const ProfileScreen({super.key, required this.onAboutTap});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -167,7 +170,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     _buildListTile(
                       Icons.info_outline,
                       "About us",
-                      onTap: () {},
+                      onTap: widget.onAboutTap,
                     ),
                     _buildListTile(
                       Icons.question_answer_outlined,
