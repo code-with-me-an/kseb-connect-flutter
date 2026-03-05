@@ -449,10 +449,7 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
             initialValue: selectedStatus,
             items: const [
               DropdownMenuItem(value: "pending", child: Text("Pending")),
-              DropdownMenuItem(
-                value: "in-progress",
-                child: Text("In-Progress"),
-              ),
+              DropdownMenuItem(value: "in-progress",child: Text("In-Progress"),),
               DropdownMenuItem(value: "resolved", child: Text("Resolved")),
             ],
             onChanged: (value) {
@@ -507,6 +504,7 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
       });
 
       _fetchCommunityComplaints();
+      _fetchPersonalComplaints();
     } catch (e) {
       ScaffoldMessenger.of(
         context,
