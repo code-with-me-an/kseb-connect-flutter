@@ -3,8 +3,7 @@ import 'package:kseb_connect/admin/admin_profile_screen.dart';
 import 'package:kseb_connect/admin/complaints_list_screen.dart';
 import 'admin_dashboard.dart';
 import 'package:kseb_connect/admin/admin_section_map_screen.dart';
-
-
+import 'create_section_notification_screen.dart';
 
 class AdminLayout extends StatefulWidget {
   const AdminLayout({super.key});
@@ -33,11 +32,12 @@ class _AdminLayoutState extends State<AdminLayout> {
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       // Top Bar
       appBar: AppBar(
-        backgroundColor: Color(0xFF219869), // Greenish teal for Admin distinction? Or keep Navy Blue.
+        backgroundColor: Color(
+          0xFF219869,
+        ), // Greenish teal for Admin distinction? Or keep Navy Blue.
         elevation: 0,
         centerTitle: true,
         automaticallyImplyLeading: false, // Hides back button
@@ -52,17 +52,21 @@ class _AdminLayoutState extends State<AdminLayout> {
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications_none, color: Colors.white),
-            onPressed: () {},
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const CreateSectionNotificationScreen(),
+                ),
+              );
+            },
           ),
           const SizedBox(width: 8),
         ],
       ),
 
       // Body
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
+      body: IndexedStack(index: _currentIndex, children: _screens),
 
       // Bottom Bar
       bottomNavigationBar: BottomNavigationBar(
@@ -73,10 +77,22 @@ class _AdminLayoutState extends State<AdminLayout> {
         unselectedItemColor: Colors.grey,
         onTap: (index) => setState(() => _currentIndex = index),
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: "Dashboard"),
-          BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), label: "Complaints"),
-          BottomNavigationBarItem(icon: Icon(Icons.location_on_outlined), label: "Map"),
-          BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: "Profile"),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard),
+            label: "Dashboard",
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.chat_bubble_outline),
+            label: "Complaints",
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.location_on_outlined),
+            label: "Map",
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            label: "Profile",
+          ),
         ],
       ),
     );

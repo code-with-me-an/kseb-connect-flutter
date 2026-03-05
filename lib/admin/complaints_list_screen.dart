@@ -446,7 +446,7 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
         return AlertDialog(
           title: const Text("Update Status"),
           content: DropdownButtonFormField<String>(
-            value: selectedStatus,
+            initialValue: selectedStatus,
             items: const [
               DropdownMenuItem(value: "pending", child: Text("Pending")),
               DropdownMenuItem(
