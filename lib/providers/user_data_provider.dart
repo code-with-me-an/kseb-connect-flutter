@@ -7,6 +7,37 @@ class UserDataProvider extends ChangeNotifier {
   List<dynamic> consumerConnections = [];
   bool isLoading = false;
 
+  String userName = "User";
+
+  // LOAD USER NAME
+  Future<void> loadUserName(String userId) async {
+    try {
+      final response = await supabase
+          .from('users')
+          .select('name')
+          .eq('id', userId)
+          .single();
+
+      userName = response['name'] ?? "User";
+      notifyListeners();
+    } catch (e) {
+      userName = "User";
+      notifyListeners();
+    }
+  }
+
+  // UPDATE USER NAME
+  Future<void> updateUserName(String userId, String newName) async {
+    await supabase
+        .from('users')
+        .update({'name': newName})
+        .eq('id', userId);
+
+    userName = newName;
+    notifyListeners();
+  }
+
+  // LOAD CONSUMERS
   Future<void> loadConsumers(String userId) async {
     try {
       isLoading = true;
@@ -28,6 +59,7 @@ class UserDataProvider extends ChangeNotifier {
 
   void clearData() {
     consumerConnections = [];
+    userName = "User";
     notifyListeners();
   }
 }

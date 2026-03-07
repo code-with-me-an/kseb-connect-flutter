@@ -17,22 +17,34 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final supabase = Supabase.instance.client;
 
-  String userName = "User";
-  bool loading = true;
   String locationName = "Fetching location...";
   bool locationLoading = true;
   List<Map<String, dynamic>> notifications = [];
   bool notificationsLoading = true;
+  bool loading = true;
+String userName = "User";
+
+static const Color backgroundWhite = Colors.white;
+static const Color sheetGrey = Color(0xFFF2F2F2);
+static const Color textDark = Colors.black87;
+
+double headerRevealHeight = 170;
 
   @override
   void initState() {
     super.initState();
 
-    _fetchUserName();
     _fetchCurrentLocationName();
     _fetchSectionNotifications();
+    _fetchUserName();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = supabase.auth.currentUser;
+
+      if (user != null) {
+        context.read<UserDataProvider>().loadUserName(user.id);
+      }
+
       _loadUserConsumers();
     });
   }
@@ -156,8 +168,11 @@ class _HomeScreenState extends State<HomeScreen> {
           loading = false;
         });
       }
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Error loading profile: $e')));
+
+      ScaffoldMessenger.of(
+        // ignore: use_build_context_synchronously
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error loading profile: $e')));
     }
   }
 
@@ -166,10 +181,11 @@ class _HomeScreenState extends State<HomeScreen> {
       final user = supabase.auth.currentUser;
       if (user == null) return;
 
-      final connections = await supabase
-          .from('consumer_connections')
-          .select('section_id')
-          .eq('user_id', user.id);
+    // Get all sections connected to the user
+    final connections = await supabase
+        .from('consumer_connections')
+        .select('section_id')
+        .eq('user_id', user.id);
 
       if (connections.isEmpty) {
         setState(() {
@@ -181,12 +197,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
       final sectionIds = connections.map((c) => c['section_id']).toList();
 
-      final response = await supabase
-          .from('notifications')
-          .select()
-          .eq('recipient_type', 'section')
-          .inFilter('section_id', sectionIds)
-          .order('created_at', ascending: false);
+    // Fetch notifications for those sections
+    final response = await supabase
+        .from('notifications')
+        .select()
+        .eq('recipient_type', 'section')
+        .inFilter('section_id', sectionIds)
+        .order('created_at', ascending: false);
 
       if (mounted) {
         setState(() {
@@ -202,13 +219,8 @@ class _HomeScreenState extends State<HomeScreen> {
   // --- UI DESIGN ---
   @override
   Widget build(BuildContext context) {
-    const backgroundWhite = Color.fromARGB(255, 255, 255, 255); // White shades for background
-    const sheetGrey = Color.fromARGB(255, 231, 232, 233); // Slightly grey for the sliding sheet to stand out
-    const orangeColor = Color(0xFFE85842); // Action button color
-    const textDark = Color(0xFF1E293B); // Dark text for readability
-
-    // Adjusted height to fit the new text and SVG layout
-    final double headerRevealHeight = 180.0; 
+    const backgroundGrey = Color(0xFFF2F2F2);
+    const orangeColor = Color(0xFFE85842); // For Report Button
 
     return Scaffold(
       backgroundColor: backgroundWhite, 
@@ -230,21 +242,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Welcome Text
                         loading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: textDark))
+                            ? const CircularProgressIndicator()
                             : Text(
                                 "Welcome, $userName",
                                 style: const TextStyle(
-                                  fontSize: 23,
-                                  fontWeight: FontWeight.w800,
-                                  color: textDark,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
+
                         const SizedBox(height: 8),
 
                         // Location Text
