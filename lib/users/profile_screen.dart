@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart'; // 1. Import this
 import 'package:kseb_connect/user_login_screen.dart';
 import '../main.dart'; // supabase client
-import 'about_us_screen.dart';
 import 'package:provider/provider.dart';
 import '../providers/user_data_provider.dart';
 

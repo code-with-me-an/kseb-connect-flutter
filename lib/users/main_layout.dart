@@ -18,8 +18,8 @@ class _MainLayoutState extends State<MainLayout> {
   final GlobalKey<NearByComplaintsScreenState> mapKey =
       GlobalKey<NearByComplaintsScreenState>();
 
-  final List<String> _titles = const [
-    "Hello, User",
+  final List<String> _titles = [
+    "KSEB Connect",
     "My Complaints",
     "Nearby Complaints",
     "My Profile",
