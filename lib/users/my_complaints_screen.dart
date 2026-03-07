@@ -20,6 +20,164 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
     fetchComplaints();
   }
 
+  Widget _buildStep(int index, int currentStep, String text) {
+    Color circleColor;
+    Widget? icon;
+
+    if (index < currentStep) {
+      circleColor = Colors.green;
+      icon = const Icon(Icons.check, size: 14, color: Colors.white);
+    } else if (index == currentStep) {
+      circleColor = Colors.blue;
+      icon = const Icon(Icons.check, size: 14, color: Colors.white);
+    } else {
+      circleColor = Colors.grey[300]!;
+    }
+
+    return Column(
+      children: [
+        Container(
+          width: 22,
+          height: 22,
+          decoration: BoxDecoration(color: circleColor, shape: BoxShape.circle),
+          child: icon,
+        ),
+        const SizedBox(height: 5),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: 10,
+            color: index <= currentStep ? circleColor : Colors.grey,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLine(int index, int currentStep) {
+    Color color;
+
+    if (index < currentStep) {
+      color = Colors.green;
+    } else if (index == currentStep) {
+      color = Colors.blue;
+    } else {
+      color = Colors.grey[300]!;
+    }
+
+    return Expanded(
+      child: Container(
+        height: 3,
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        color: color,
+      ),
+    );
+  }
+
+  void showComplaintStatusDialog(Map<String, dynamic> complaint) {
+  String status = complaint['status'] ?? "";
+
+  int step = 0;
+
+  if (status == "pending") {
+    step = 1;
+  } else if (status == "in-progress") {
+    step = 2;
+  } else if (status == "resolved") {
+    step = 3;
+  }
+
+  showDialog(
+    context: context,
+    builder: (context) {
+      return Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20),
+        backgroundColor: Colors.transparent,
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.9, // proper width
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "Complaint Status",
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              /// PROGRESS BAR
+              Row(
+                children: [
+                  _buildStep(0, step, "Reported"),
+                  _buildLine(0, step),
+
+                  _buildStep(1, step, "Assigned"),
+                  _buildLine(1, step),
+
+                  _buildStep(2, step, "In Progress"),
+                  _buildLine(2, step),
+
+                  _buildStep(3, step, "Resolved"),
+                ],
+              ),
+
+              const SizedBox(height: 18),
+
+              /// INFO BOX
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.info_outline,
+                      size: 18,
+                      color: Colors.grey,
+                    ),
+
+                    const SizedBox(width: 8),
+
+                    Expanded(
+                      child: Text(
+                        "Complaint #${complaint['tracking_code']} | ${complaint['description']}",
+                        style: TextStyle(
+                          color: Colors.grey[700],
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
   Future<void> deleteComplaint(String complaintId) async {
     try {
       await supabase
@@ -167,20 +325,27 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
                       itemBuilder: (context, index) {
                         final complaint = complaints[index];
 
-                        return ComplaintCard(
-                          status: complaint['status'] ?? "",
-                          onDelete: () =>
-                              confirmDelete(complaint['tracking_code']),
-                          id: complaint['tracking_code'] ?? "",
-                          title: complaint['category'] ?? "",
-                          description: complaint['description'] ?? "",
-                          date: complaint['created_at'].toString().substring(
-                            0,
-                            10,
+                        return GestureDetector(
+                          onTap: () {
+                            showComplaintStatusDialog(complaint);
+                          },
+                          child: ComplaintCard(
+                            status: complaint['status'] ?? "",
+                            onDelete: () =>
+                                confirmDelete(complaint['tracking_code']),
+                            id: complaint['tracking_code'] ?? "",
+                            title: complaint['category'] ?? "",
+                            description: complaint['description'] ?? "",
+                            date: complaint['created_at'].toString().substring(
+                              0,
+                              10,
+                            ),
+                            statusLabel: complaint['status'] ?? "",
+                            statusButtonText: _formatStatus(
+                              complaint['status'],
+                            ),
+                            statusColor: _getStatusColor(complaint['status']),
                           ),
-                          statusLabel: complaint['status'] ?? "",
-                          statusButtonText: _formatStatus(complaint['status']),
-                          statusColor: _getStatusColor(complaint['status']),
                         );
                       },
                     ),
@@ -197,7 +362,7 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
     switch (status) {
       case "pending":
         return const Color(0xFFE89020);
-      case "in_progress":
+      case "in-progress":
         return const Color(0xFF2E77AE);
       case "resolved":
         return const Color(0xFF38D52D);
