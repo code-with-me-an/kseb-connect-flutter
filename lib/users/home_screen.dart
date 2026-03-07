@@ -16,19 +16,25 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final supabase = Supabase.instance.client;
 
-  String userName = "User";
-  bool loading = true;
   String locationName = "Fetching location...";
   bool locationLoading = true;
+  List<Map<String, dynamic>> notifications = [];
+  bool notificationsLoading = true;
 
   @override
   void initState() {
     super.initState();
 
-    _fetchUserName();
     _fetchCurrentLocationName();
+    _fetchSectionNotifications();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = supabase.auth.currentUser;
+
+      if (user != null) {
+        context.read<UserDataProvider>().loadUserName(user.id);
+      }
+
       _loadUserConsumers();
     });
   }
@@ -113,54 +119,50 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _fetchUserName() async {
-    final user = supabase.auth.currentUser;
-
-    if (user == null) {
-      if (mounted) setState(() => loading = false);
-      return;
-    }
-
+  Future<void> _fetchSectionNotifications() async {
     try {
-      final response = await supabase
-          .from('users')
-          .select('name')
-          .eq('id', user.id)
-          .maybeSingle();
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
 
-      if (response != null) {
-        if (mounted) {
-          setState(() {
-            userName = response['name'] ?? "User";
-            loading = false;
-          });
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            userName = "User";
-            loading = false;
-          });
-        }
+      // Get all sections connected to the user
+      final connections = await supabase
+          .from('consumer_connections')
+          .select('section_id')
+          .eq('user_id', user.id);
+
+      if (connections.isEmpty) {
+        setState(() {
+          notifications = [];
+          notificationsLoading = false;
+        });
+        return;
       }
-    } catch (e) {
-      debugPrint('Error fetching user name: $e');
+
+      final sectionIds = connections.map((c) => c['section_id']).toList();
+
+      // Fetch notifications for those sections
+      final response = await supabase
+          .from('notifications')
+          .select()
+          .eq('recipient_type', 'section')
+          .inFilter('section_id', sectionIds)
+          .order('created_at', ascending: false);
+
       if (mounted) {
         setState(() {
-          userName = "User";
-          loading = false;
+          notifications = List<Map<String, dynamic>>.from(response);
+          notificationsLoading = false;
         });
       }
-
-      ScaffoldMessenger.of(
-        // ignore: use_build_context_synchronously
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error loading profile: $e')));
+    } catch (e) {
+      debugPrint("Notification fetch error: $e");
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<UserDataProvider>();
+
     const backgroundGrey = Color(0xFFF2F2F2);
     const orangeColor = Color(0xFFE85842); // For Report Button
 
@@ -207,15 +209,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        loading
-                            ? const CircularProgressIndicator()
-                            : Text(
-                                "Welcome, $userName",
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                        Text(
+                          "Welcome, ${provider.userName}",
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
 
                         const SizedBox(height: 8),
                         RichText(
@@ -414,29 +414,26 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 15),
 
-            // Alert 1 (Yellow)
-            _buildAlertCard(
-              color: const Color(0xFFFFF8E1), // Light Yellow
-              icon: Icons.warning_amber_rounded,
-              iconColor: Colors.amber[800]!,
-              text: "Power shutdown today at 3 PM in Westhill",
-              badgeText: "High Priority",
-              badgeColor: Colors.orange[100]!,
-              badgeTextColor: Colors.orange[800]!,
-            ),
-
-            const SizedBox(height: 10),
-
-            // Alert 2 (Blue)
-            _buildAlertCard(
-              color: const Color(0xFFE3F2FD), // Light Blue
-              icon: Icons.info_outline,
-              iconColor: Colors.blue[800]!,
-              text: "Scheduled maintenance tomorrow at 10 AM by KSEB",
-              badgeText: "900 m",
-              badgeColor: Colors.white,
-              badgeTextColor: Colors.grey,
-            ),
+            notificationsLoading
+                ? const Center(child: CircularProgressIndicator())
+                : notifications.isEmpty
+                ? const Text("No announcements")
+                : Column(
+                    children: notifications.map((notif) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _buildAlertCard(
+                          color: const Color(0xFFE3F2FD),
+                          icon: Icons.campaign,
+                          iconColor: Colors.blue,
+                          text: notif['message'] ?? '',
+                          badgeText: "New",
+                          badgeColor: Colors.white,
+                          badgeTextColor: Colors.blue,
+                        ),
+                      );
+                    }).toList(),
+                  ),
 
             const SizedBox(height: 25),
 

@@ -3,6 +3,8 @@ import 'package:flutter_svg/flutter_svg.dart'; // 1. Import this
 import 'package:kseb_connect/user_login_screen.dart';
 import '../main.dart'; // supabase client
 import 'about_us_screen.dart';
+import 'package:provider/provider.dart';
+import '../providers/user_data_provider.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback onAboutTap;
@@ -18,6 +20,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String phoneNumber = '';
   String joinDate = '';
   bool loading = true;
+
+  final TextEditingController nameController = TextEditingController();
 
   @override
   void initState() {
@@ -67,6 +71,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
       "Dec",
     ];
     return months[month - 1];
+  }
+
+  Future<void> showEditNameDialog() async {
+    nameController.text = userName;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Edit Name"),
+
+          content: TextField(
+            controller: nameController,
+            decoration: const InputDecoration(
+              labelText: "Enter new name",
+              border: OutlineInputBorder(),
+            ),
+          ),
+
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text("Cancel"),
+            ),
+
+            ElevatedButton(
+              onPressed: () async {
+                final newName = nameController.text.trim();
+
+                if (newName.isEmpty) return;
+
+                final userId = supabase.auth.currentUser!.id;
+
+                await context.read<UserDataProvider>().updateUserName(
+                  userId,
+                  newName,
+                );
+
+                setState(() {
+                  userName = newName;
+                });
+
+                Navigator.pop(context);
+              },
+
+              child: const Text("Save"),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -138,7 +195,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     _buildListTile(
                       Icons.account_balance_wallet_outlined,
                       "Profile",
-                      onTap: () {},
+                      onTap: showEditNameDialog,
                     ),
                   ]),
 

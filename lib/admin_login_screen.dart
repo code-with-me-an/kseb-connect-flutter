@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:kseb_connect/admin/main_layout.dart';
+import 'package:kseb_connect/user_login_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -18,6 +19,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
 
   bool keepSignedIn = false;
   bool loading = false;
+  bool _passwordVisible = false;
 
   @override
   void initState() {
@@ -56,27 +58,25 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
 
     try {
       final response = await supabase
-    .rpc('verify_officer_login', params: {
-      'input_username': username,
-      'input_password': password,
-    })
-    .single();
+          .rpc(
+            'verify_officer_login',
+            params: {'input_username': username, 'input_password': password},
+          )
+          .single();
 
-        final prefs = await SharedPreferences.getInstance();
+      final prefs = await SharedPreferences.getInstance();
 
-        await prefs.setBool('admin_logged_in', true);
-        await prefs.setString('admin_id', response['officer_id']);
-        await prefs.setString('admin_username', response['username']);
-        await prefs.setString('admin_section_id', response['section_id']);
+      await prefs.setBool('admin_logged_in', true);
+      await prefs.setString('admin_id', response['officer_id']);
+      await prefs.setString('admin_username', response['username']);
+      await prefs.setString('admin_section_id', response['section_id']);
 
-        if (!mounted) return;
+      if (!mounted) return;
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const AdminLayout(),
-          ),
-        );
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const AdminLayout()),
+      );
     } catch (e) {
       String errorMessage = 'Login failed';
 
@@ -90,10 +90,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(errorMessage),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
       );
     } finally {
       if (mounted) {
@@ -120,13 +117,13 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           child: Container(
-            height: MediaQuery.of(context).size.height -
+            height:
+                MediaQuery.of(context).size.height -
                 MediaQuery.of(context).padding.top,
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-
                 /// LOGO
                 Padding(
                   padding: const EdgeInsets.only(top: 20.0),
@@ -166,8 +163,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                       Text(
                         "Enter your username and password to\naccess your account",
                         textAlign: TextAlign.center,
-                        style:
-                            TextStyle(fontSize: 14, color: Colors.grey[600]),
+                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                       ),
                     ],
                   ),
@@ -207,7 +203,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                 const SizedBox(height: 8),
                 TextField(
                   controller: passwordController,
-                  obscureText: true,
+                  obscureText: !_passwordVisible,
                   decoration: InputDecoration(
                     hintText: "**********",
                     filled: true,
@@ -218,6 +214,19 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
+                    ),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _passwordVisible
+                            ? Icons.visibility
+                            : Icons.visibility_off,
+                        color: Colors.grey,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _passwordVisible = !_passwordVisible;
+                        });
+                      },
                     ),
                   ),
                 ),
@@ -262,9 +271,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                       elevation: 0,
                     ),
                     child: loading
-                        ? const CircularProgressIndicator(
-                            color: Colors.white,
-                          )
+                        ? const CircularProgressIndicator(color: Colors.white)
                         : const Text(
                             "Continue",
                             style: TextStyle(
@@ -283,8 +290,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                   child: RichText(
                     text: TextSpan(
                       text: "consumer ? ",
-                      style:
-                          TextStyle(color: Colors.grey[600], fontSize: 14),
+                      style: TextStyle(color: Colors.grey[600], fontSize: 14),
                       children: [
                         TextSpan(
                           text: "Sign up here",
@@ -294,7 +300,12 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                           ),
                           recognizer: TapGestureRecognizer()
                             ..onTap = () {
-                              Navigator.pop(context);
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const LoginScreen(),
+                                ),
+                              );
                             },
                         ),
                       ],
