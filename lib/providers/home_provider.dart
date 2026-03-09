@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
-
+import 'dart:math';
 class HomeProvider extends ChangeNotifier {
   final supabase = Supabase.instance.client;
 
@@ -11,7 +11,7 @@ class HomeProvider extends ChangeNotifier {
   bool loading = true;
 
   List<Map<String, dynamic>> notifications = [];
-
+  List<Map<String, dynamic>> nearbyComplaints = [];
   Future<void> loadHomeData() async {
     loading = true;
     notifyListeners();
@@ -20,11 +20,15 @@ class HomeProvider extends ChangeNotifier {
     if (user == null) return;
 
     try {
-      final results = await Future.wait([
-        _fetchUserName(user.id),
-        _fetchLocation(),
-        _fetchNotifications(user.id),
-      ]);
+   Position position = await Geolocator.getCurrentPosition();
+
+final results = await Future.wait([
+  _fetchUserName(user.id),
+  _fetchLocation(),
+  _fetchNotifications(user.id),
+]);
+
+await _fetchNearbyComplaints(position);
 
       userName = results[0] as String;
       locationName = results[1] as String;
@@ -76,4 +80,79 @@ class HomeProvider extends ChangeNotifier {
 
     return List<Map<String, dynamic>>.from(response);
   }
+  Future<void> _fetchNearbyComplaints(Position userPosition) async {
+
+  final response = await supabase
+      .from('complaints')
+      .select('complaint_id, category, latitude, longitude, status, created_at')
+      .order('created_at', ascending: false);
+
+  nearbyComplaints = [];
+
+  for (var complaint in response) {
+
+    if (complaint['latitude'] != null && complaint['longitude'] != null) {
+
+      double distance = calculateDistance(
+        userPosition.latitude,
+        userPosition.longitude,
+        complaint['latitude'].toDouble(),
+        complaint['longitude'].toDouble(),
+      );
+
+    if (distance <= 5) {
+
+  final locationName = await getLocationName(
+    complaint['latitude'].toDouble(),
+    complaint['longitude'].toDouble(),
+  );
+
+  complaint['distance'] = distance;
+  complaint['locationName'] = locationName;
+
+  nearbyComplaints.add(complaint);
+}
+    }
+  }
+}
+}
+double calculateDistance(
+  double lat1,
+  double lon1,
+  double lat2,
+  double lon2,
+) {
+  const earthRadius = 6371; // km
+
+  double dLat = (lat2 - lat1) * pi / 180;
+  double dLon = (lon2 - lon1) * pi / 180;
+
+  double a =
+      sin(dLat / 2) * sin(dLat / 2) +
+      cos(lat1 * pi / 180) *
+          cos(lat2 * pi / 180) *
+          sin(dLon / 2) *
+          sin(dLon / 2);
+
+  double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+
+  return earthRadius * c;
+}
+Future<String> getLocationName(double lat, double lng) async {
+  try {
+    List<Placemark> placemarks = await placemarkFromCoordinates(lat, lng);
+
+    if (placemarks.isNotEmpty) {
+      final place = placemarks.first;
+
+      return place.locality ??
+          place.subLocality ??
+          place.administrativeArea ??
+          "Unknown";
+    }
+  } catch (e) {
+    debugPrint(e.toString());
+  }
+
+  return "Unknown";
 }

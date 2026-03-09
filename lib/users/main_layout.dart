@@ -8,13 +8,31 @@ import 'about_us_screen.dart';
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
 
+  static void openNearbyComplaint(double lat, double lng) {
+    _MainLayoutState.instance?.openNearbyComplaint(lat, lng);
+  }
+
   @override
   State<MainLayout> createState() => _MainLayoutState();
 }
 
 class _MainLayoutState extends State<MainLayout> {
+  static _MainLayoutState? instance;
   int _currentIndex = 0;
   bool showAbout = false;
+  @override
+void initState() {
+  super.initState();
+  instance = this;
+}
+void openNearbyComplaint(double lat, double lng) {
+  setState(() {
+    _currentIndex = 2; // Map tab index
+    showAbout = false;
+  });
+
+  mapKey.currentState?.focusComplaint(lat, lng);
+}
   final GlobalKey<NearByComplaintsScreenState> mapKey =
       GlobalKey<NearByComplaintsScreenState>();
 

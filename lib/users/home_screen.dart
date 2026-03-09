@@ -4,6 +4,8 @@ import 'package:kseb_connect/providers/home_provider.dart';
 import 'report_complaint_screen.dart';
 import 'package:provider/provider.dart';
 import '../providers/user_data_provider.dart';
+import 'nearby_complaints_screen.dart';
+import 'main_layout.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -53,15 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-
-    if (_firstLoad) {
-      context.read<HomeProvider>().loadHomeData();
-      _firstLoad = false;
-    }
-  }
+ 
 
   // --- UI DESIGN ---
   @override
@@ -380,28 +374,33 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(height: 12),
 
                         // Static Issue List matching design
-                        Column(
-                          children: [
-                            _buildIssueItem(
-                              title: "Power Outage",
-                              location: "East Hill",
-                              status: "In Progress",
-                              distance: "1.2 km away",
-                              statusColor: Colors.blue.shade700,
-                              iconContainerColor: Colors.orange.shade50,
-                              iconColor: Colors.orange,
-                            ),
-                            _buildIssueItem(
-                              title: "Street Light Failure",
-                              location: "Nadakkavu",
-                              status: "Assigned",
-                              distance: "0.8 km away",
-                              statusColor: Colors.green.shade600,
-                              iconContainerColor: Colors.orange.shade50,
-                              iconColor: Colors.orange,
-                            ),
-                          ],
-                        ),
+                      home.nearbyComplaints.isEmpty
+    ? const Text(
+        "No issues reported near you",
+        style: TextStyle(color: Colors.grey),
+      )
+    : Column(
+        children: home.nearbyComplaints.map((complaint) {
+          return GestureDetector(
+            onTap: () {
+MainLayout.openNearbyComplaint(
+  complaint['latitude'],
+  complaint['longitude'],
+);
+            },
+            child: _buildIssueItem(
+              title: complaint['category'] ?? "Complaint",
+              location: complaint['locationName'] ?? "Unknown",
+              status: complaint['status'] ?? "Pending",
+              distance:
+                  "${complaint['distance'].toStringAsFixed(1)} km away",
+              statusColor: Colors.orange,
+              iconContainerColor: Colors.orange.shade50,
+              iconColor: Colors.orange,
+            ),
+          );
+        }).toList(),
+      ),
                         const SizedBox(
                           height: 40,
                         ), // Extra bottom padding for scroll

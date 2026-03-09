@@ -7,16 +7,27 @@ import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class NearByComplaintsScreen extends StatefulWidget {
-  const NearByComplaintsScreen({super.key});
+
+  final double? highlightLat;
+  final double? highlightLng;
+
+  const NearByComplaintsScreen({
+    super.key,
+    this.highlightLat,
+    this.highlightLng,
+  });
 
   @override
-  State<NearByComplaintsScreen> createState() => NearByComplaintsScreenState();
+  State<NearByComplaintsScreen> createState() =>
+      NearByComplaintsScreenState();
 }
 
 class NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
   DateTime? _lastFetchTime;
   final Color navyBlue = const Color(0xFF0D3B66);
   int? _selectedMarkerIndex;
+  int? _highlightIndex;
+  bool _mapReady = false;
   final MapController _mapController = MapController();
 
   List<Map<String, dynamic>> _complaints = [];
@@ -124,6 +135,61 @@ class NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
     _mapController.move(userLocation, 15.0);
   }
 
+
+  void _focusHighlightedComplaint() {
+  if (!_mapReady) return;
+
+  if (widget.highlightLat == null || widget.highlightLng == null) return;
+
+  for (int i = 0; i < _complaints.length; i++) {
+    final point = _complaints[i]['point'];
+
+    if ((point.latitude - widget.highlightLat!).abs() < 0.0001 &&
+        (point.longitude - widget.highlightLng!).abs() < 0.0001) {
+
+      setState(() {
+        _highlightIndex = i;
+        _selectedMarkerIndex = i;
+      });
+
+      _mapController.move(point, 16);
+
+      Future.delayed(const Duration(seconds: 7), () {
+        if (mounted) {
+          setState(() => _highlightIndex = null);
+        }
+      });
+
+      break;
+    }
+  }
+}
+void focusComplaint(double lat, double lng) {
+
+  for (int i = 0; i < _complaints.length; i++) {
+    final point = _complaints[i]['point'];
+
+    if ((point.latitude - lat).abs() < 0.0001 &&
+        (point.longitude - lng).abs() < 0.0001) {
+
+      setState(() {
+        _highlightIndex = i;
+        _selectedMarkerIndex = i;
+      });
+
+      _mapController.move(point, 16);
+
+      Future.delayed(const Duration(seconds: 7), () {
+        if (mounted) {
+          setState(() => _highlightIndex = null);
+        }
+      });
+
+      break;
+    }
+  }
+}
+
   // ================= UPVOTE LOGIC =================
 
   Future<void> _upvoteComplaint(String complaintId) async {
@@ -168,9 +234,13 @@ class NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
                     minZoom: 7.0,
                     onTap: (_, _) =>
                         setState(() => _selectedMarkerIndex = null),
-                    onMapReady: () {
-                      _moveToCurrentLocation();
-                    },
+                    onMapReady: () async {
+    _mapReady = true;
+
+    await _moveToCurrentLocation();
+
+    _focusHighlightedComplaint();
+  },
                   ),
                   children: [
                     TileLayer(
@@ -212,11 +282,15 @@ class NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
                                     : index;
                               });
                             },
-                            child: SvgPicture.asset(
-                              'assets/marker.svg',
-                              width: 35,
-                              height: 35,
-                            ),
+                           child: AnimatedScale(
+  duration: const Duration(milliseconds: 300),
+  scale: _highlightIndex == index ? 1.5 : 1.0,
+  child: SvgPicture.asset(
+    'assets/marker.svg',
+    width: _highlightIndex == index ? 45 : 35,
+    height: _highlightIndex == index ? 45 : 35,
+  ),
+),
                           ),
                         );
                       }).toList(),
