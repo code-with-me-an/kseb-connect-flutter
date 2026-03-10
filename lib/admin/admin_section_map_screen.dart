@@ -176,7 +176,6 @@ void initState() {
     );
   }
   Widget _buildComplaintPopup(Map<String, dynamic> complaint) {
-  final photoUrl = complaint['photo_url'];
 
   return Container(
     padding: const EdgeInsets.all(16),
@@ -185,7 +184,7 @@ void initState() {
       borderRadius: BorderRadius.circular(12),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withOpacity(0.1),
+          color: Colors.black.withValues(alpha:0.1),
           blurRadius: 10,
         )
       ],

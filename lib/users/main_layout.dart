@@ -5,6 +5,8 @@ import 'nearby_complaints_screen.dart';
 import 'profile_screen.dart';
 import 'about_us_screen.dart';
 
+import '../main.dart';
+
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
 
@@ -20,19 +22,24 @@ class _MainLayoutState extends State<MainLayout> {
   static _MainLayoutState? instance;
   int _currentIndex = 0;
   bool showAbout = false;
-  @override
-void initState() {
-  super.initState();
-  instance = this;
-}
-void openNearbyComplaint(double lat, double lng) {
-  setState(() {
-    _currentIndex = 2; // Map tab index
-    showAbout = false;
-  });
 
-  mapKey.currentState?.focusComplaint(lat, lng);
-}
+  List<Map<String, dynamic>> userNotifications = [];
+  bool loadingNotifications = false;
+  @override
+  void initState() {
+    super.initState();
+    instance = this;
+  }
+
+  void openNearbyComplaint(double lat, double lng) {
+    setState(() {
+      _currentIndex = 2; // Map tab index
+      showAbout = false;
+    });
+
+    mapKey.currentState?.focusComplaint(lat, lng);
+  }
+
   final GlobalKey<NearByComplaintsScreenState> mapKey =
       GlobalKey<NearByComplaintsScreenState>();
 
@@ -42,6 +49,47 @@ void openNearbyComplaint(double lat, double lng) {
     "Nearby Complaints",
     "My Profile",
   ];
+
+  String _formatTime(String? timestamp) {
+  if (timestamp == null) return "";
+
+  final time = DateTime.parse(timestamp).toLocal();
+  final difference = DateTime.now().difference(time);
+
+  if (difference.inMinutes < 60) {
+    return "${difference.inMinutes} min ago";
+  } else if (difference.inHours < 24) {
+    return "${difference.inHours} hrs ago";
+  } else {
+    return "${difference.inDays} days ago";
+  }
+}
+
+  Future<void> _fetchUserNotifications() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    setState(() {
+      loadingNotifications = true;
+    });
+
+    try {
+      final response = await supabase
+          .from('notifications')
+          .select()
+          .eq('recipient_type', 'user')
+          .eq('user_id', user.id)
+          .order('created_at', ascending: false);
+
+      userNotifications = List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint(e.toString());
+    }
+
+    setState(() {
+      loadingNotifications = false;
+    });
+  }
 
   // --- NEW: Function to show the Notification Box ---
   void _showNotifications(BuildContext context) {
@@ -82,29 +130,23 @@ void openNearbyComplaint(double lat, double lng) {
                 const Divider(height: 30),
 
                 // Notification Items
-                _buildNotificationItem(
-                  icon: Icons.check_circle,
-                  color: Colors.green,
-                  title: "Complaint Resolved",
-                  subtitle: "Your voltage issue (CMP12343) has been fixed.",
-                  time: "2 hrs ago",
-                ),
-                const SizedBox(height: 15),
-                _buildNotificationItem(
-                  icon: Icons.info,
-                  color: Colors.blue,
-                  title: "Officer Assigned",
-                  subtitle: "Officer Rajesh is reviewing your complaint.",
-                  time: "5 hrs ago",
-                ),
-                const SizedBox(height: 15),
-                _buildNotificationItem(
-                  icon: Icons.warning_amber_rounded,
-                  color: Colors.orange,
-                  title: "Maintenance Alert",
-                  subtitle: "Scheduled power cut tomorrow at 10 AM.",
-                  time: "1 day ago",
-                ),
+                if (loadingNotifications)
+  const Center(child: CircularProgressIndicator())
+else if (userNotifications.isEmpty)
+  const Center(child: Text("No notifications"))
+else
+  ...userNotifications.take(6).map((notif) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 15),
+      child: _buildNotificationItem(
+        icon: Icons.notifications,
+        color: notif['is_alert'] == true ? Colors.orange : Colors.blue,
+        title: notif['title'] ?? "Notification",
+        subtitle: notif['message'] ?? "",
+        time: _formatTime(notif['created_at']),
+      ),
+    );
+  }),
 
                 const SizedBox(height: 10),
 
@@ -194,7 +236,10 @@ void openNearbyComplaint(double lat, double lng) {
           IconButton(
             icon: const Icon(Icons.notifications_none, color: Colors.white),
             //  Trigger the notification dialog here
-            onPressed: () => _showNotifications(context),
+            onPressed: () async {
+              await _fetchUserNotifications();
+              _showNotifications(context);
+            },
           ),
           const SizedBox(width: 8),
         ],
@@ -202,22 +247,22 @@ void openNearbyComplaint(double lat, double lng) {
 
       // ✅ BODY SWITCHES HERE
       body: showAbout
-    ? const AboutUsScreen()
-    : IndexedStack(
-        index: _currentIndex,
-        children: [
-          const HomeScreen(),
-          const MyComplaintsScreen(),
-          NearByComplaintsScreen(key: mapKey),
-          ProfileScreen(
-            onAboutTap: () {
-              setState(() {
-                showAbout = true;
-              });
-            },
-          ),
-        ],
-      ),
+          ? const AboutUsScreen()
+          : IndexedStack(
+              index: _currentIndex,
+              children: [
+                const HomeScreen(),
+                const MyComplaintsScreen(),
+                NearByComplaintsScreen(key: mapKey),
+                ProfileScreen(
+                  onAboutTap: () {
+                    setState(() {
+                      showAbout = true;
+                    });
+                  },
+                ),
+              ],
+            ),
 
       // ✅ BOTTOM BAR (single)
       bottomNavigationBar: BottomNavigationBar(

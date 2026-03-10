@@ -4,7 +4,6 @@ import 'package:kseb_connect/providers/home_provider.dart';
 import 'report_complaint_screen.dart';
 import 'package:provider/provider.dart';
 import '../providers/user_data_provider.dart';
-import 'nearby_complaints_screen.dart';
 import 'main_layout.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -22,7 +21,6 @@ class _HomeScreenState extends State<HomeScreen> {
   double maxPullDown = 40;
   double bottomLimit = 60;
   bool isHolding = false;
-  bool _firstLoad = true;
 
   static const Color backgroundWhite = Colors.white;
   static const Color sheetGrey = Color.fromARGB(255, 231, 231, 231);
@@ -89,8 +87,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      Colors.black.withOpacity(0.55),
-                      Colors.black.withOpacity(0.25),
+                      Colors.black.withValues(alpha:0.55),
+                      Colors.black.withValues(alpha:0.25),
                       Colors.transparent,
                     ],
                     begin: Alignment.topLeft,
@@ -145,7 +143,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.85),
+                        color: Colors.green.withValues(alpha: 0.85),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Text(
@@ -203,7 +201,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
+                          color: Colors.black.withValues(alpha:0.05),
                           blurRadius: 10,
                           offset: const Offset(
                             0,
@@ -258,7 +256,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 borderRadius: BorderRadius.circular(15),
                               ),
                               elevation: 5,
-                              shadowColor: orangeColor.withOpacity(0.4),
+                              shadowColor: orangeColor.withValues(alpha:0.4),
                             ),
                             onPressed: () {
                               Navigator.push(
@@ -435,7 +433,7 @@ MainLayout.openNearbyComplaint(
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha:0.03),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -529,7 +527,7 @@ MainLayout.openNearbyComplaint(
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha:0.03),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
