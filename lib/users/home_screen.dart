@@ -53,8 +53,6 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
- 
-
   // --- UI DESIGN ---
   @override
   Widget build(BuildContext context) {
@@ -87,8 +85,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      Colors.black.withValues(alpha:0.55),
-                      Colors.black.withValues(alpha:0.25),
+                      Colors.black.withValues(alpha: 0.55),
+                      Colors.black.withValues(alpha: 0.25),
                       Colors.transparent,
                     ],
                     begin: Alignment.topLeft,
@@ -201,7 +199,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha:0.05),
+                          color: Colors.black.withValues(alpha: 0.05),
                           blurRadius: 10,
                           offset: const Offset(
                             0,
@@ -256,7 +254,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 borderRadius: BorderRadius.circular(15),
                               ),
                               elevation: 5,
-                              shadowColor: orangeColor.withValues(alpha:0.4),
+                              shadowColor: orangeColor.withValues(alpha: 0.4),
                             ),
                             onPressed: () {
                               Navigator.push(
@@ -335,12 +333,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                   return Padding(
                                     padding: const EdgeInsets.only(bottom: 12),
                                     child: _buildAlertCard(
-                                      icon: Icons.info_outline,
+                                      icon: notif['is_alert'] == true
+                                          ? Icons.warning_amber_rounded
+                                          : Icons.info_outline,
                                       iconColor: Colors.blue.shade700,
-                                      title: "Notification",
+                                      title: notif['title'] ?? "Notification",
                                       text: notif['message'] ?? '',
                                       date: "Today",
-                                      badgeText: "NEW",
+                                      badgeText: notif['is_read'] == false
+                                          ? "NEW"
+                                          : "OLD",
                                       badgeColor: Colors.orange.shade100,
                                       badgeTextColor: Colors.orange.shade800,
                                     ),
@@ -372,33 +374,38 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(height: 12),
 
                         // Static Issue List matching design
-                      home.nearbyComplaints.isEmpty
-    ? const Text(
-        "No issues reported near you",
-        style: TextStyle(color: Colors.grey),
-      )
-    : Column(
-        children: home.nearbyComplaints.map((complaint) {
-          return GestureDetector(
-            onTap: () {
-MainLayout.openNearbyComplaint(
-  complaint['latitude'],
-  complaint['longitude'],
-);
-            },
-            child: _buildIssueItem(
-              title: complaint['category'] ?? "Complaint",
-              location: complaint['locationName'] ?? "Unknown",
-              status: complaint['status'] ?? "Pending",
-              distance:
-                  "${complaint['distance'].toStringAsFixed(1)} km away",
-              statusColor: Colors.orange,
-              iconContainerColor: Colors.orange.shade50,
-              iconColor: Colors.orange,
-            ),
-          );
-        }).toList(),
-      ),
+                        home.nearbyComplaints.isEmpty
+                            ? const Text(
+                                "No issues reported near you",
+                                style: TextStyle(color: Colors.grey),
+                              )
+                            : Column(
+                                children: home.nearbyComplaints.map((
+                                  complaint,
+                                ) {
+                                  return GestureDetector(
+                                    onTap: () {
+                                      MainLayout.openNearbyComplaint(
+                                        complaint['latitude'],
+                                        complaint['longitude'],
+                                      );
+                                    },
+                                    child: _buildIssueItem(
+                                      title:
+                                          complaint['category'] ?? "Complaint",
+                                      location:
+                                          complaint['locationName'] ??
+                                          "Unknown",
+                                      status: complaint['status'] ?? "Pending",
+                                      distance:
+                                          "${complaint['distance'].toStringAsFixed(1)} km away",
+                                      statusColor: Colors.orange,
+                                      iconContainerColor: Colors.orange.shade50,
+                                      iconColor: Colors.orange,
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
                         const SizedBox(
                           height: 40,
                         ), // Extra bottom padding for scroll
@@ -433,7 +440,7 @@ MainLayout.openNearbyComplaint(
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha:0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -527,7 +534,7 @@ MainLayout.openNearbyComplaint(
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha:0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),

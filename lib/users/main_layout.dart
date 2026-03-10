@@ -4,7 +4,6 @@ import 'my_complaints_screen.dart';
 import 'nearby_complaints_screen.dart';
 import 'profile_screen.dart';
 import 'about_us_screen.dart';
-
 import '../main.dart';
 
 class MainLayout extends StatefulWidget {
@@ -20,25 +19,12 @@ class MainLayout extends StatefulWidget {
 
 class _MainLayoutState extends State<MainLayout> {
   static _MainLayoutState? instance;
+
   int _currentIndex = 0;
   bool showAbout = false;
 
   List<Map<String, dynamic>> userNotifications = [];
   bool loadingNotifications = false;
-  @override
-  void initState() {
-    super.initState();
-    instance = this;
-  }
-
-  void openNearbyComplaint(double lat, double lng) {
-    setState(() {
-      _currentIndex = 2; // Map tab index
-      showAbout = false;
-    });
-
-    mapKey.currentState?.focusComplaint(lat, lng);
-  }
 
   final GlobalKey<NearByComplaintsScreenState> mapKey =
       GlobalKey<NearByComplaintsScreenState>();
@@ -50,20 +36,35 @@ class _MainLayoutState extends State<MainLayout> {
     "My Profile",
   ];
 
-  String _formatTime(String? timestamp) {
-  if (timestamp == null) return "";
-
-  final time = DateTime.parse(timestamp).toLocal();
-  final difference = DateTime.now().difference(time);
-
-  if (difference.inMinutes < 60) {
-    return "${difference.inMinutes} min ago";
-  } else if (difference.inHours < 24) {
-    return "${difference.inHours} hrs ago";
-  } else {
-    return "${difference.inDays} days ago";
+  @override
+  void initState() {
+    super.initState();
+    instance = this;
   }
-}
+
+  void openNearbyComplaint(double lat, double lng) {
+    setState(() {
+      _currentIndex = 2;
+      showAbout = false;
+    });
+
+    mapKey.currentState?.focusComplaint(lat, lng);
+  }
+
+  String _formatTime(String? timestamp) {
+    if (timestamp == null) return "";
+
+    final time = DateTime.parse(timestamp).toLocal();
+    final difference = DateTime.now().difference(time);
+
+    if (difference.inMinutes < 60) {
+      return "${difference.inMinutes} min ago";
+    } else if (difference.inHours < 24) {
+      return "${difference.inHours} hrs ago";
+    } else {
+      return "${difference.inDays} days ago";
+    }
+  }
 
   Future<void> _fetchUserNotifications() async {
     final user = supabase.auth.currentUser;
@@ -91,81 +92,112 @@ class _MainLayoutState extends State<MainLayout> {
     });
   }
 
-  // --- NEW: Function to show the Notification Box ---
   void _showNotifications(BuildContext context) {
+    bool showAllNotifications = false;
+
     showDialog(
       context: context,
-      builder: (BuildContext context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20.0),
-          ), // Rounded corners
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min, // Wrap content height
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final notificationsToShow = showAllNotifications
+                ? userNotifications
+                : userNotifications.take(3).toList();
+
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Container(
+                constraints: const BoxConstraints(maxHeight: 420),
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      "Notifications",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                    /// HEADER
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          "Notifications",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          child: const Icon(Icons.close, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+
+                    const Divider(height: 30),
+
+                    /// CONTENT
+                    Expanded(
+                      child: loadingNotifications
+                          ? const Center(child: CircularProgressIndicator())
+                          : userNotifications.isEmpty
+                              ? const Center(
+                                  child: Text(
+                                    "No notifications",
+                                    style: TextStyle(color: Colors.grey),
+                                  ),
+                                )
+                              : SingleChildScrollView(
+                                  child: Column(
+                                    children: notificationsToShow.map((notif) {
+                                      return Padding(
+                                        padding:
+                                            const EdgeInsets.only(bottom: 15),
+                                        child: _buildNotificationItem(
+                                          icon: Icons.notifications,
+                                          color: notif['is_alert'] == true
+                                              ? Colors.orange
+                                              : Colors.blue,
+                                          title: notif['title'] ??
+                                              "Notification",
+                                          subtitle: notif['message'] ?? "",
+                                          time: _formatTime(
+                                              notif['created_at']),
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ),
+                    ),
+
+                    /// TOGGLE BUTTON
+                    if (userNotifications.length > 3)
+                      Center(
+                        child: TextButton(
+                          onPressed: () {
+                            setDialogState(() {
+                              showAllNotifications = !showAllNotifications;
+                            });
+                          },
+                          child: Text(
+                            showAllNotifications
+                                ? "Hide Notifications"
+                                : "View All Notifications",
+                          ),
+                        ),
                       ),
-                    ),
-                    GestureDetector(
-                      onTap: () => Navigator.of(context).pop(),
-                      child: const Icon(Icons.close, color: Colors.grey),
-                    ),
                   ],
                 ),
-                const Divider(height: 30),
-
-                // Notification Items
-                if (loadingNotifications)
-  const Center(child: CircularProgressIndicator())
-else if (userNotifications.isEmpty)
-  const Center(child: Text("No notifications"))
-else
-  ...userNotifications.take(6).map((notif) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 15),
-      child: _buildNotificationItem(
-        icon: Icons.notifications,
-        color: notif['is_alert'] == true ? Colors.orange : Colors.blue,
-        title: notif['title'] ?? "Notification",
-        subtitle: notif['message'] ?? "",
-        time: _formatTime(notif['created_at']),
-      ),
-    );
-  }),
-
-                const SizedBox(height: 10),
-
-                // 'View All' Link
-                Center(
-                  child: TextButton(
-                    onPressed: () {},
-                    child: const Text("View All Notifications"),
-                  ),
-                ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );
   }
 
-  // --- Helper Widget for Notification Row ---
   Widget _buildNotificationItem({
     required IconData icon,
     required Color color,
@@ -219,7 +251,6 @@ else
     const navyBlue = Color(0xFF0D3B66);
 
     return Scaffold(
-      // TOP BAR (single source of truth)
       appBar: AppBar(
         backgroundColor: navyBlue,
         elevation: 0,
@@ -235,7 +266,6 @@ else
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications_none, color: Colors.white),
-            //  Trigger the notification dialog here
             onPressed: () async {
               await _fetchUserNotifications();
               _showNotifications(context);
@@ -245,7 +275,6 @@ else
         ],
       ),
 
-      // ✅ BODY SWITCHES HERE
       body: showAbout
           ? const AboutUsScreen()
           : IndexedStack(
@@ -264,7 +293,6 @@ else
               ],
             ),
 
-      // ✅ BOTTOM BAR (single)
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: const Color.fromARGB(255, 255, 248, 248),
         currentIndex: _currentIndex,
@@ -276,6 +304,7 @@ else
             _currentIndex = index;
             showAbout = false;
           });
+
           if (index == 2) {
             mapKey.currentState?.fetchNearbyComplaints();
           }

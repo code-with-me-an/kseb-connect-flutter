@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'dart:math';
+
 class HomeProvider extends ChangeNotifier {
   final supabase = Supabase.instance.client;
 
@@ -12,6 +13,9 @@ class HomeProvider extends ChangeNotifier {
 
   List<Map<String, dynamic>> notifications = [];
   List<Map<String, dynamic>> nearbyComplaints = [];
+
+  RealtimeChannel? notificationChannel;
+
   Future<void> loadHomeData() async {
     loading = true;
     notifyListeners();
@@ -20,15 +24,15 @@ class HomeProvider extends ChangeNotifier {
     if (user == null) return;
 
     try {
-   Position position = await Geolocator.getCurrentPosition();
+      Position position = await Geolocator.getCurrentPosition();
 
-final results = await Future.wait([
-  _fetchUserName(user.id),
-  _fetchLocation(),
-  _fetchNotifications(user.id),
-]);
+      final results = await Future.wait([
+        _fetchUserName(user.id),
+        _fetchLocation(),
+        _fetchNotifications(user.id),
+      ]);
 
-await _fetchNearbyComplaints(position);
+      await _fetchNearbyComplaints(position);
 
       userName = results[0] as String;
       locationName = results[1] as String;
@@ -72,6 +76,9 @@ await _fetchNearbyComplaints(position);
 
     final sectionIds = connections.map((c) => c['section_id']).toList();
 
+    // Start realtime listener
+    listenToNotifications(sectionIds);
+
     final response = await supabase
         .from('notifications')
         .select()
@@ -80,49 +87,76 @@ await _fetchNearbyComplaints(position);
 
     return List<Map<String, dynamic>>.from(response);
   }
+
+  void listenToNotifications(List sectionIds) {
+    notificationChannel = supabase
+        .channel('notifications-realtime')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'notifications',
+          callback: (payload) {
+            final newNotification = payload.newRecord;
+
+            if (sectionIds.contains(newNotification['section_id'])) {
+              notifications.insert(0, newNotification);
+              notifyListeners();
+            }
+          },
+        )
+        .subscribe();
+  }
+
   Future<void> _fetchNearbyComplaints(Position userPosition) async {
+    final response = await supabase
+        .from('complaints')
+        .select(
+          'complaint_id, category, latitude, longitude, status, created_at',
+        )
+        .order('created_at', ascending: false);
 
-  final response = await supabase
-      .from('complaints')
-      .select('complaint_id, category, latitude, longitude, status, created_at')
-      .order('created_at', ascending: false);
+    nearbyComplaints = [];
 
-  nearbyComplaints = [];
+    for (var complaint in response) {
+      if (complaint['latitude'] != null && complaint['longitude'] != null) {
+        double distance = calculateDistance(
+          userPosition.latitude,
+          userPosition.longitude,
+          complaint['latitude'].toDouble(),
+          complaint['longitude'].toDouble(),
+        );
 
-  for (var complaint in response) {
+        if (distance <= 5) {
+          final locationName = await getLocationName(
+            complaint['latitude'].toDouble(),
+            complaint['longitude'].toDouble(),
+          );
 
-    if (complaint['latitude'] != null && complaint['longitude'] != null) {
+          complaint['distance'] = distance;
+          complaint['locationName'] = locationName;
 
-      double distance = calculateDistance(
-        userPosition.latitude,
-        userPosition.longitude,
-        complaint['latitude'].toDouble(),
-        complaint['longitude'].toDouble(),
-      );
-
-    if (distance <= 5) {
-
-  final locationName = await getLocationName(
-    complaint['latitude'].toDouble(),
-    complaint['longitude'].toDouble(),
-  );
-
-  complaint['distance'] = distance;
-  complaint['locationName'] = locationName;
-
-  nearbyComplaints.add(complaint);
-}
+          nearbyComplaints.add(complaint);
+        }
+      }
     }
   }
+
+  @override
+  void dispose() {
+    if (notificationChannel != null) {
+      supabase.removeChannel(notificationChannel!);
+    }
+    super.dispose();
+  }
 }
-}
+
 double calculateDistance(
   double lat1,
   double lon1,
   double lat2,
   double lon2,
 ) {
-  const earthRadius = 6371; // km
+  const earthRadius = 6371;
 
   double dLat = (lat2 - lat1) * pi / 180;
   double dLon = (lon2 - lon1) * pi / 180;
@@ -138,6 +172,7 @@ double calculateDistance(
 
   return earthRadius * c;
 }
+
 Future<String> getLocationName(double lat, double lng) async {
   try {
     List<Placemark> placemarks = await placemarkFromCoordinates(lat, lng);
