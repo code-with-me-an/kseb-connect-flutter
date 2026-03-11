@@ -22,16 +22,14 @@ class _MainLayoutState extends State<MainLayout> {
 
   int _currentIndex = 0;
   bool showAbout = false;
-
   List<Map<String, dynamic>> userNotifications = [];
   bool loadingNotifications = false;
-
   final GlobalKey<NearByComplaintsScreenState> mapKey =
       GlobalKey<NearByComplaintsScreenState>();
 
   final List<String> _titles = [
     "KSEB Connect",
-    "My Complaints",
+    "My Complaints"
     "Nearby Complaints",
     "My Profile",
   ];
@@ -314,7 +312,8 @@ class _MainLayoutState extends State<MainLayout> {
           });
 
           if (index == 2) {
-            mapKey.currentState?.fetchNearbyComplaints();
+            // Map reload logic
+            mapKey.currentState?.fetchNearbyComplaints(forceRefresh: true);
           }
         },
         items: const [

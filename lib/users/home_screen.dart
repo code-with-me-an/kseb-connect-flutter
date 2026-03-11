@@ -10,10 +10,10 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<HomeScreen> createState() => HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class HomeScreenState extends State<HomeScreen> {
   HomeProvider get home => context.watch<HomeProvider>();
   UserDataProvider get userData => context.watch<UserDataProvider>();
 
@@ -48,6 +48,7 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final userId = supabase.auth.currentUser!.id;
 
+      context.read<HomeProvider>().startRealtime();
       context.read<HomeProvider>().loadHomeData();
       context.read<UserDataProvider>().loadUserName(userId);
     });
@@ -61,6 +62,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     const orangeColor = Color(0xFFE85842); // For Report Button
     double headerRevealHeight = 200;
+    final complaints = home.nearbyComplaints; //fetches complanints
 
     return Scaffold(
       backgroundColor: backgroundWhite,
@@ -374,15 +376,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(height: 12),
 
                         // Static Issue List matching design
-                        home.nearbyComplaints.isEmpty
+                        home.loading
+                            ? const Center(child: CircularProgressIndicator())
+                            : complaints.isEmpty
                             ? const Text(
                                 "No issues reported near you",
                                 style: TextStyle(color: Colors.grey),
                               )
                             : Column(
-                                children: home.nearbyComplaints.map((
-                                  complaint,
-                                ) {
+                                children: complaints.map((complaint) {
                                   return GestureDetector(
                                     onTap: () {
                                       MainLayout.openNearbyComplaint(
@@ -398,7 +400,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                           "Unknown",
                                       status: complaint['status'] ?? "Pending",
                                       distance:
-                                          "${complaint['distance'].toStringAsFixed(1)} km away",
+                                          "${(complaint['distance'] ?? 0).toStringAsFixed(1)} km away",
                                       statusColor: Colors.orange,
                                       iconContainerColor: Colors.orange.shade50,
                                       iconColor: Colors.orange,

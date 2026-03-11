@@ -7,7 +7,6 @@ import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class NearByComplaintsScreen extends StatefulWidget {
-
   final double? highlightLat;
   final double? highlightLng;
 
@@ -18,8 +17,7 @@ class NearByComplaintsScreen extends StatefulWidget {
   });
 
   @override
-  State<NearByComplaintsScreen> createState() =>
-      NearByComplaintsScreenState();
+  State<NearByComplaintsScreen> createState() => NearByComplaintsScreenState();
 }
 
 class NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
@@ -135,60 +133,57 @@ class NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
     _mapController.move(userLocation, 15.0);
   }
 
-
   void _focusHighlightedComplaint() {
-  if (!_mapReady) return;
+    if (!_mapReady) return;
 
-  if (widget.highlightLat == null || widget.highlightLng == null) return;
+    if (widget.highlightLat == null || widget.highlightLng == null) return;
 
-  for (int i = 0; i < _complaints.length; i++) {
-    final point = _complaints[i]['point'];
+    for (int i = 0; i < _complaints.length; i++) {
+      final point = _complaints[i]['point'];
 
-    if ((point.latitude - widget.highlightLat!).abs() < 0.0001 &&
-        (point.longitude - widget.highlightLng!).abs() < 0.0001) {
+      if ((point.latitude - widget.highlightLat!).abs() < 0.0001 &&
+          (point.longitude - widget.highlightLng!).abs() < 0.0001) {
+        setState(() {
+          _highlightIndex = i;
+          _selectedMarkerIndex = i;
+        });
 
-      setState(() {
-        _highlightIndex = i;
-        _selectedMarkerIndex = i;
-      });
+        _mapController.move(point, 16);
 
-      _mapController.move(point, 16);
+        Future.delayed(const Duration(seconds: 7), () {
+          if (mounted) {
+            setState(() => _highlightIndex = null);
+          }
+        });
 
-      Future.delayed(const Duration(seconds: 7), () {
-        if (mounted) {
-          setState(() => _highlightIndex = null);
-        }
-      });
-
-      break;
+        break;
+      }
     }
   }
-}
-void focusComplaint(double lat, double lng) {
 
-  for (int i = 0; i < _complaints.length; i++) {
-    final point = _complaints[i]['point'];
+  void focusComplaint(double lat, double lng) {
+    for (int i = 0; i < _complaints.length; i++) {
+      final point = _complaints[i]['point'];
 
-    if ((point.latitude - lat).abs() < 0.0001 &&
-        (point.longitude - lng).abs() < 0.0001) {
+      if ((point.latitude - lat).abs() < 0.0001 &&
+          (point.longitude - lng).abs() < 0.0001) {
+        setState(() {
+          _highlightIndex = i;
+          _selectedMarkerIndex = i;
+        });
 
-      setState(() {
-        _highlightIndex = i;
-        _selectedMarkerIndex = i;
-      });
+        _mapController.move(point, 16);
 
-      _mapController.move(point, 16);
+        Future.delayed(const Duration(seconds: 7), () {
+          if (mounted) {
+            setState(() => _highlightIndex = null);
+          }
+        });
 
-      Future.delayed(const Duration(seconds: 7), () {
-        if (mounted) {
-          setState(() => _highlightIndex = null);
-        }
-      });
-
-      break;
+        break;
+      }
     }
   }
-}
 
   // ================= UPVOTE LOGIC =================
 
@@ -235,12 +230,12 @@ void focusComplaint(double lat, double lng) {
                     onTap: (_, _) =>
                         setState(() => _selectedMarkerIndex = null),
                     onMapReady: () async {
-    _mapReady = true;
+                      _mapReady = true;
 
-    await _moveToCurrentLocation();
+                      await _moveToCurrentLocation();
 
-    _focusHighlightedComplaint();
-  },
+                      _focusHighlightedComplaint();
+                    },
                   ),
                   children: [
                     TileLayer(
@@ -282,15 +277,15 @@ void focusComplaint(double lat, double lng) {
                                     : index;
                               });
                             },
-                           child: AnimatedScale(
-  duration: const Duration(milliseconds: 300),
-  scale: _highlightIndex == index ? 1.5 : 1.0,
-  child: SvgPicture.asset(
-    'assets/marker.svg',
-    width: _highlightIndex == index ? 45 : 35,
-    height: _highlightIndex == index ? 45 : 35,
-  ),
-),
+                            child: AnimatedScale(
+                              duration: const Duration(milliseconds: 300),
+                              scale: _highlightIndex == index ? 1.5 : 1.0,
+                              child: SvgPicture.asset(
+                                'assets/marker.svg',
+                                width: _highlightIndex == index ? 45 : 35,
+                                height: _highlightIndex == index ? 45 : 35,
+                              ),
+                            ),
                           ),
                         );
                       }).toList(),
