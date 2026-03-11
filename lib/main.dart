@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:kseb_connect/providers/complaint_provider.dart';
 import 'package:kseb_connect/providers/home_provider.dart';
+import 'package:kseb_connect/services/realtime_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -16,12 +18,16 @@ Future<void> main() async {
     url: 'https://ozfkdvalelvgrygihqxr.supabase.co',
     anonKey: 'sb_publishable_XVYY0q-iNacej703cOQmqA_vZ9PBryl',
   );
+  RealtimeService.start();
 
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => UserDataProvider()),
         ChangeNotifierProvider(create: (_) => HomeProvider()),
+        ChangeNotifierProvider(
+          create: (_) => ComplaintProvider()..loadComplaints(),
+        ),
       ],
       child: const MyApp(),
     ),

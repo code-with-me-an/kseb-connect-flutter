@@ -29,7 +29,7 @@ class _MainLayoutState extends State<MainLayout> {
 
   final List<String> _titles = [
     "KSEB Connect",
-    "My Complaints"
+    "My Complaints",
     "Nearby Complaints",
     "My Profile",
   ];
@@ -312,8 +312,7 @@ class _MainLayoutState extends State<MainLayout> {
           });
 
           if (index == 2) {
-            // Map reload logic
-            mapKey.currentState?.fetchNearbyComplaints(forceRefresh: true);
+            mapKey.currentState?.refreshMap();
           }
         },
         items: const [

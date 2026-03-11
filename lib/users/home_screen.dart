@@ -1,9 +1,8 @@
-import '../main.dart';
 import 'package:flutter/material.dart';
+import 'package:kseb_connect/providers/complaint_provider.dart';
 import 'package:kseb_connect/providers/home_provider.dart';
 import 'report_complaint_screen.dart';
 import 'package:provider/provider.dart';
-import '../providers/user_data_provider.dart';
 import 'main_layout.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -15,7 +14,6 @@ class HomeScreen extends StatefulWidget {
 
 class HomeScreenState extends State<HomeScreen> {
   HomeProvider get home => context.watch<HomeProvider>();
-  UserDataProvider get userData => context.watch<UserDataProvider>();
 
   final ScrollController _scrollController = ScrollController();
   double maxPullDown = 40;
@@ -29,28 +27,25 @@ class HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+
     _scrollController.addListener(() {
       if (!_scrollController.hasClients) return;
 
       double offset = _scrollController.offset;
 
-      // restrict pull down
       if (offset < -maxPullDown) {
         _scrollController.jumpTo(-maxPullDown);
       }
 
-      // restrict bottom scroll
       if (offset > _scrollController.position.maxScrollExtent) {
         _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
       }
     });
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final userId = supabase.auth.currentUser!.id;
-
-      context.read<HomeProvider>().startRealtime();
-      context.read<HomeProvider>().loadHomeData();
-      context.read<UserDataProvider>().loadUserName(userId);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final provider = context.read<HomeProvider>();
+      await provider.loadHomeData();
+      context.read<ComplaintProvider>().loadComplaints();
     });
   }
 
@@ -62,7 +57,10 @@ class HomeScreenState extends State<HomeScreen> {
     }
     const orangeColor = Color(0xFFE85842); // For Report Button
     double headerRevealHeight = 200;
-    final complaints = home.nearbyComplaints; //fetches complanints
+    final complaintProvider = context.watch<ComplaintProvider>();
+
+   final complaints = complaintProvider.nearbyComplaints;
+
 
     return Scaffold(
       backgroundColor: backgroundWhite,
@@ -100,7 +98,7 @@ class HomeScreenState extends State<HomeScreen> {
                   children: [
                     // Welcome Text
                     Text(
-                      "Welcome, ${userData.userName}",
+                      "Welcome, ${home.userName}",
                       style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
@@ -146,9 +144,9 @@ class HomeScreenState extends State<HomeScreen> {
                         color: Colors.green.withValues(alpha: 0.85),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Text(
-                        "2 Active Complaints",
-                        style: TextStyle(
+                      child: Text(
+                        "${complaints.length} Active Complaints",
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -388,8 +386,8 @@ class HomeScreenState extends State<HomeScreen> {
                                   return GestureDetector(
                                     onTap: () {
                                       MainLayout.openNearbyComplaint(
-                                        complaint['latitude'],
-                                        complaint['longitude'],
+                                        complaint['point'].latitude,
+                                        complaint['point'].longitude,
                                       );
                                     },
                                     child: _buildIssueItem(
