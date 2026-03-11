@@ -77,7 +77,12 @@ class _MainLayoutState extends State<MainLayout> {
     try {
       final response = await supabase
           .from('notifications')
-          .select()
+          .select('''
+          *,
+          complaints (
+            tracking_code
+          )
+        ''')
           .eq('recipient_type', 'user')
           .eq('user_id', user.id)
           .order('created_at', ascending: false);
@@ -143,33 +148,36 @@ class _MainLayoutState extends State<MainLayout> {
                       child: loadingNotifications
                           ? const Center(child: CircularProgressIndicator())
                           : userNotifications.isEmpty
-                              ? const Center(
-                                  child: Text(
-                                    "No notifications",
-                                    style: TextStyle(color: Colors.grey),
-                                  ),
-                                )
-                              : SingleChildScrollView(
-                                  child: Column(
-                                    children: notificationsToShow.map((notif) {
-                                      return Padding(
-                                        padding:
-                                            const EdgeInsets.only(bottom: 15),
-                                        child: _buildNotificationItem(
-                                          icon: Icons.notifications,
-                                          color: notif['is_alert'] == true
-                                              ? Colors.orange
-                                              : Colors.blue,
-                                          title: notif['title'] ??
-                                              "Notification",
-                                          subtitle: notif['message'] ?? "",
-                                          time: _formatTime(
-                                              notif['created_at']),
-                                        ),
-                                      );
-                                    }).toList(),
-                                  ),
-                                ),
+                          ? const Center(
+                              child: Text(
+                                "No notifications",
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                            )
+                          : SingleChildScrollView(
+                              child: Column(
+                                children: notificationsToShow.map((notif) {
+                                  final trackingCode =
+                                      notif['complaints']?['tracking_code'];
+
+                                  final subtitleText = trackingCode != null
+                                      ? "${notif['message']} (Tracking: $trackingCode)"
+                                      : notif['message'] ?? "";
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 15),
+                                    child: _buildNotificationItem(
+                                      icon: Icons.notifications,
+                                      color: notif['is_alert'] == true
+                                          ? Colors.orange
+                                          : Colors.blue,
+                                      title: notif['title'] ?? "Notification",
+                                      subtitle: subtitleText,
+                                      time: _formatTime(notif['created_at']),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
                     ),
 
                     /// TOGGLE BUTTON
