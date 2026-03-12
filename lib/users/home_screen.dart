@@ -392,7 +392,7 @@ class HomeScreenState extends State<HomeScreen> {
                                     },
                                     child: _buildIssueItem(
                                       title:
-                                          complaint['category'] ?? "Complaint",
+                                          complaint['title'] ?? "Complaint",
                                       location:
                                           complaint['locationName'] ??
                                           "Unknown",
