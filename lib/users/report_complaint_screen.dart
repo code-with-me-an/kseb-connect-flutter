@@ -437,18 +437,19 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
                 if (mounted) {
                   setState(() {
                     category = v;
-
-                    // CHANGED: Reset section only for Personal
-                    if (v == "Personal") {
-                      _selectedSectionId = null;
-                    }
                     _selectedConsumerId = null;
+                    _selectedSectionId = null;
                   });
                 }
 
-                // CHANGED: Fetch connections for Personal, section for Community
+                final user = Supabase.instance.client.auth.currentUser;
+
                 if (v == "Personal") {
-                  
+                  if (user != null) {
+                    await context.read<UserDataProvider>().loadConsumers(
+                      user.id,
+                    );
+                  }
                 } else if (v == "Community") {
                   await _centerToCurrentLocation();
                 }
@@ -490,34 +491,33 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
             // 🔥 IMPROVEMENT 5: Show Consumer Dropdown ONLY if Personal
             // ======================
             if (category == "Personal") ...[
-  if (isLoadingConsumers)
-    const Center(child: CircularProgressIndicator())
-  else if (consumers.isEmpty)
-    const Text("No consumer connections found.")
-  else
-    _buildCustomDropdown(
-      hint: "Select Consumer Number",
-      value: _selectedConsumerId,
-      items: consumers.map<Map<String, String>>((e) {
-        return {
-          "value": e['consumer_id'].toString(),
-          "label": e['consumer_number'].toString(),
-        };
-      }).toList(),
-      onChanged: (val) {
-        final selected = consumers.firstWhere(
-          (e) => e['consumer_id'].toString() == val,
-        );
+              if (isLoadingConsumers)
+                const Center(child: CircularProgressIndicator())
+              else if (consumers.isEmpty)
+                const Text("No consumer connections found.")
+              else
+                _buildCustomDropdown(
+                  hint: "Select Consumer Number",
+                  value: _selectedConsumerId,
+                  items: consumers.map<Map<String, String>>((e) {
+                    return {
+                      "value": e['consumer_id'].toString(),
+                      "label": e['consumer_number'].toString(),
+                    };
+                  }).toList(),
+                  onChanged: (val) {
+                    final selected = consumers.firstWhere(
+                      (e) => e['consumer_id'].toString() == val,
+                    );
 
-        setState(() {
-          _selectedConsumerId = selected['consumer_id'].toString();
-          _selectedSectionId = selected['section_id'].toString();
-        });
-      },
-    ),
-],
+                    setState(() {
+                      _selectedConsumerId = selected['consumer_id'].toString();
+                      _selectedSectionId = selected['section_id'].toString();
+                    });
+                  },
+                ),
+            ],
 
-              
             const SizedBox(height: 15),
             Container(
               decoration: BoxDecoration(
