@@ -10,6 +10,8 @@ import 'users/main_layout.dart';
 import 'admin/main_layout.dart';
 import 'package:provider/provider.dart';
 import 'providers/user_data_provider.dart';
+import 'services/local_notification_service.dart';
+import 'users/notification_detail_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,6 +21,14 @@ Future<void> main() async {
     anonKey: 'sb_publishable_XVYY0q-iNacej703cOQmqA_vZ9PBryl',
   );
   RealtimeService.start();
+
+  await LocalNotificationService.initialize((payload) {
+    if (payload == null) return;
+
+    navigatorKey.currentState?.pushNamed("/notification", arguments: payload);
+  });
+
+  await LocalNotificationService.requestPermission();
 
   runApp(
     MultiProvider(
@@ -36,6 +46,7 @@ Future<void> main() async {
 
 // Global Supabase client
 final supabase = Supabase.instance.client;
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey();
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
@@ -77,10 +88,13 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home:
-          _startScreen ??
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
-    );
+  debugShowCheckedModeBanner: false,
+  navigatorKey: navigatorKey,
+  routes: {
+    "/notification": (context) => const NotificationDetailScreen(),
+  },
+  home: _startScreen ??
+      const Scaffold(body: Center(child: CircularProgressIndicator())),
+);
   }
 }

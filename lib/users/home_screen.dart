@@ -24,6 +24,47 @@ class HomeScreenState extends State<HomeScreen> {
   static const Color sheetGrey = Color.fromARGB(255, 231, 231, 231);
   static const Color textDark = Colors.black87;
 
+  // for realtime color change
+
+  Color getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case "pending":
+        return const Color(0xFFE89020); // orange
+      case "in-progress":
+        return const Color(0xFF2E77AE); // blue
+      case "resolved":
+        return const Color(0xFF38D52D); // green
+      default:
+        return Colors.grey;
+    }
+  }
+
+  Color getStatusIconBg(String status) {
+    switch (status.toLowerCase()) {
+      case "pending":
+        return const Color(0xFFFFF3E0);
+      case "in-progress":
+        return const Color(0xFFE3F2FD);
+      case "resolved":
+        return const Color(0xFFE8F5E9);
+      default:
+        return Colors.grey.shade200;
+    }
+  }
+
+  Color getStatusIconColor(String status) {
+    switch (status.toLowerCase()) {
+      case "pending":
+        return const Color(0xFFE89020);
+      case "in-progress":
+        return const Color(0xFF2E77AE);
+      case "resolved":
+        return const Color(0xFF38D52D);
+      default:
+        return Colors.grey;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -59,8 +100,7 @@ class HomeScreenState extends State<HomeScreen> {
     double headerRevealHeight = 200;
     final complaintProvider = context.watch<ComplaintProvider>();
 
-   final complaints = complaintProvider.nearbyComplaints;
-
+    final complaints = complaintProvider.nearbyComplaints;
 
     return Scaffold(
       backgroundColor: backgroundWhite,
@@ -391,17 +431,22 @@ class HomeScreenState extends State<HomeScreen> {
                                       );
                                     },
                                     child: _buildIssueItem(
-                                      title:
-                                          complaint['title'] ?? "Complaint",
+                                      title: complaint['title'] ?? "Complaint",
                                       location:
                                           complaint['locationName'] ??
                                           "Unknown",
                                       status: complaint['status'] ?? "Pending",
                                       distance:
                                           "${(complaint['distance'] ?? 0).toStringAsFixed(1)} km away",
-                                      statusColor: Colors.orange,
-                                      iconContainerColor: Colors.orange.shade50,
-                                      iconColor: Colors.orange,
+                                      statusColor: getStatusColor(
+                                        complaint['status'] ?? "pending",
+                                      ),
+                                      iconContainerColor: getStatusIconBg(
+                                        complaint['status'] ?? "pending",
+                                      ),
+                                      iconColor: getStatusIconColor(
+                                        complaint['status'] ?? "pending",
+                                      ),
                                     ),
                                   );
                                 }).toList(),

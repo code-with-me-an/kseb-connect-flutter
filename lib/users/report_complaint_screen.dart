@@ -309,6 +309,7 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
               'consumer_id': complaintType == 'personal' ? consumerId : null,
               'latitude': latitude,
               'longitude': longitude,
+              'location_name': locationName,
               'image_url': imageUrl,
             })
             .select()

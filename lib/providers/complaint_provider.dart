@@ -80,7 +80,9 @@ class ComplaintProvider extends ChangeNotifier {
   // ===============================
 
   Future<void> updateNearbyComplaints() async {
-    await getUserLocation();
+    if (userLocation == null) {
+      await getUserLocation();
+    }
 
     if (userLocation == null) return;
 
@@ -154,10 +156,18 @@ class ComplaintProvider extends ChangeNotifier {
     RealtimeService.onComplaint = (data) async {
       final id = data['complaint_id'];
 
-      final exists = complaints.any((c) => c['complaint_id'] == id);
+      final index = complaints.indexWhere((c) => c['complaint_id'] == id);
 
-      if (exists) return;
+      // If complaint already exists → update status
+      if (index != -1) {
+        complaints[index]['status'] = data['status'];
 
+        await updateNearbyComplaints();
+
+        return;
+      }
+
+      // If new complaint → fetch full record
       final response = await supabase
           .from('complaints')
           .select('''
@@ -168,6 +178,7 @@ class ComplaintProvider extends ChangeNotifier {
         description,
         latitude,
         longitude,
+        location_name,
         status,
         created_at,
         upvotes(count)
@@ -178,8 +189,6 @@ class ComplaintProvider extends ChangeNotifier {
       complaints.insert(0, response);
 
       await updateNearbyComplaints();
-
-      notifyListeners();
     };
 
     /// realtime upvotes

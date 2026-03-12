@@ -5,6 +5,8 @@ import 'nearby_complaints_screen.dart';
 import 'profile_screen.dart';
 import 'about_us_screen.dart';
 import '../main.dart';
+import '../services/local_notification_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -19,6 +21,7 @@ class MainLayout extends StatefulWidget {
 
 class _MainLayoutState extends State<MainLayout> {
   static _MainLayoutState? instance;
+  bool _realtimeStarted = false;
 
   int _currentIndex = 0;
   bool showAbout = false;
@@ -38,6 +41,38 @@ class _MainLayoutState extends State<MainLayout> {
   void initState() {
     super.initState();
     instance = this;
+    _startRealtimeNotifications();
+  }
+
+  void _startRealtimeNotifications() {
+    if (_realtimeStarted) return;
+    _realtimeStarted = true;
+
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    supabase
+        .channel('realtime:user_notifications')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'notifications',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: user.id,
+          ),
+          callback: (payload) {
+            final data = payload.newRecord;
+
+            LocalNotificationService.showNotification(
+              title: data['title'] ?? "Notification",
+              body: data['message'] ?? "",
+              payload: data['notification_id']?.toString(),
+            );
+          },
+        )
+        .subscribe();
   }
 
   void openNearbyComplaint(double lat, double lng) {

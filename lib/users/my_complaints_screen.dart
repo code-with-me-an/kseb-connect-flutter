@@ -14,10 +14,47 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
   List<Map<String, dynamic>> complaints = [];
   bool loading = true;
 
+  RealtimeChannel? _channel;
+
   @override
   void initState() {
     super.initState();
     fetchComplaints();
+    startRealtime();
+  }
+
+  void startRealtime() {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    _channel = supabase
+        .channel('realtime:user_complaints')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'complaints',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: user.id,
+          ),
+          callback: (payload) async {
+            final event = payload.eventType;
+
+            if (event == PostgresChangeEvent.insert) {
+              fetchComplaints(); // new complaint
+            }
+
+            if (event == PostgresChangeEvent.update) {
+              fetchComplaints(); // status changed
+            }
+
+            if (event == PostgresChangeEvent.delete) {
+              fetchComplaints(); // complaint deleted
+            }
+          },
+        )
+        .subscribe();
   }
 
   Widget _buildStep(int index, int currentStep, String text) {
@@ -75,108 +112,105 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
   }
 
   void showComplaintStatusDialog(Map<String, dynamic> complaint) {
-  String status = complaint['status'] ?? "";
+    String status = complaint['status'] ?? "";
 
-  int step = 0;
+    int step = 0;
 
-  if (status == "pending") {
-    step = 1;
-  } else if (status == "in-progress") {
-    step = 2;
-  } else if (status == "resolved") {
-    step = 3;
-  }
+    if (status == "pending") {
+      step = 1;
+    } else if (status == "in-progress") {
+      step = 2;
+    } else if (status == "resolved") {
+      step = 3;
+    }
 
-  showDialog(
-    context: context,
-    builder: (context) {
-      return Dialog(
-        insetPadding: const EdgeInsets.symmetric(horizontal: 20),
-        backgroundColor: Colors.transparent,
-        child: Container(
-          width: MediaQuery.of(context).size.width * 0.9, // proper width
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                "Complaint Status",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20),
+          backgroundColor: Colors.transparent,
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.9, // proper width
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
-              ),
+              ],
+            ),
 
-              const SizedBox(height: 20),
-
-              /// PROGRESS BAR
-              Row(
-                children: [
-                  _buildStep(0, step, "Reported"),
-                  _buildLine(0, step),
-
-                  _buildStep(1, step, "Assigned"),
-                  _buildLine(1, step),
-
-                  _buildStep(2, step, "In Progress"),
-                  _buildLine(2, step),
-
-                  _buildStep(3, step, "Resolved"),
-                ],
-              ),
-
-              const SizedBox(height: 18),
-
-              /// INFO BOX
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Complaint Status",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+
+                const SizedBox(height: 20),
+
+                /// PROGRESS BAR
+                Row(
                   children: [
-                    const Icon(
-                      Icons.info_outline,
-                      size: 18,
-                      color: Colors.grey,
-                    ),
+                    _buildStep(0, step, "Reported"),
+                    _buildLine(0, step),
 
-                    const SizedBox(width: 8),
+                    _buildStep(1, step, "Assigned"),
+                    _buildLine(1, step),
 
-                    Expanded(
-                      child: Text(
-                        "Complaint #${complaint['tracking_code']} | ${complaint['description']}",
-                        style: TextStyle(
-                          color: Colors.grey[700],
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
+                    _buildStep(2, step, "In Progress"),
+                    _buildLine(2, step),
+
+                    _buildStep(3, step, "Resolved"),
                   ],
                 ),
-              ),
-            ],
+
+                const SizedBox(height: 18),
+
+                /// INFO BOX
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.info_outline,
+                        size: 18,
+                        color: Colors.grey,
+                      ),
+
+                      const SizedBox(width: 8),
+
+                      Expanded(
+                        child: Text(
+                          "Complaint #${complaint['tracking_code']} | ${complaint['description']}",
+                          style: TextStyle(
+                            color: Colors.grey[700],
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      );
-    },
-  );
-}
+        );
+      },
+    );
+  }
 
   Future<void> deleteComplaint(String complaintId) async {
     try {
@@ -370,6 +404,11 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
         return Colors.grey;
     }
   }
+  @override
+void dispose() {
+  _channel?.unsubscribe();
+  super.dispose();
+}
 }
 
 // --- Custom Complaint Card Widget ---

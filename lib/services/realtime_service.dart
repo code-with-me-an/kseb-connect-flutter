@@ -1,21 +1,19 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RealtimeService {
-
   static final supabase = Supabase.instance.client;
 
   static RealtimeChannel? _channel;
 
   // callbacks
-  static Function(Map<String,dynamic>)? onComplaint;
-  static Function(Map<String,dynamic>)? onUpvote;
-  static Function(Map<String,dynamic>)? onNotification;
+  static Function(Map<String, dynamic>)? onComplaint;
+  static Function(Map<String, dynamic>)? onUpvote;
+  static Function(Map<String, dynamic>)? onNotification;
 
   static bool _started = false;
 
-  static void start(){
-
-    if(_started) return;
+  static void start() {
+    if (_started) return;
 
     _started = true;
 
@@ -29,14 +27,24 @@ class RealtimeService {
       event: PostgresChangeEvent.insert,
       schema: 'public',
       table: 'complaints',
-      callback: (payload){
-
+      callback: (payload) {
         final data = payload.newRecord;
 
-        if(onComplaint != null){
+        if (onComplaint != null) {
           onComplaint!(data);
         }
+      },
+    );
+    _channel!.onPostgresChanges(
+      event: PostgresChangeEvent.update,
+      schema: 'public',
+      table: 'complaints',
+      callback: (payload) {
+        final data = payload.newRecord;
 
+        if (onComplaint != null) {
+          onComplaint!(data);
+        }
       },
     );
 
@@ -48,14 +56,12 @@ class RealtimeService {
       event: PostgresChangeEvent.insert,
       schema: 'public',
       table: 'upvotes',
-      callback: (payload){
-
+      callback: (payload) {
         final data = payload.newRecord;
 
-        if(onUpvote != null){
+        if (onUpvote != null) {
           onUpvote!(data);
         }
-
       },
     );
 
@@ -67,18 +73,15 @@ class RealtimeService {
       event: PostgresChangeEvent.insert,
       schema: 'public',
       table: 'notifications',
-      callback: (payload){
-
+      callback: (payload) {
         final data = payload.newRecord;
 
-        if(onNotification != null){
+        if (onNotification != null) {
           onNotification!(data);
         }
-
       },
     );
 
     _channel!.subscribe();
   }
-
 }
