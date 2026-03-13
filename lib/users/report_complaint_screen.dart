@@ -467,17 +467,19 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
                 if (mounted) {
                   setState(() {
                     category = v;
-
-                    // CHANGED: Reset section only for Personal
-                    if (v == "Personal") {
-                      _selectedSectionId = null;
-                    }
                     _selectedConsumerId = null;
+                    _selectedSectionId = null;
                   });
                 }
 
-                // CHANGED: Fetch connections for Personal, section for Community
+                final user = Supabase.instance.client.auth.currentUser;
+
                 if (v == "Personal") {
+                  if (user != null) {
+                    await context.read<UserDataProvider>().loadConsumers(
+                      user.id,
+                    );
+                  }
                 } else if (v == "Community") {
                   await _centerToCurrentLocation();
                 }
