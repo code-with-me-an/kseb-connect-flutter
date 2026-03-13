@@ -5,9 +5,10 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:provider/provider.dart';
+import '../providers/complaint_provider.dart';
 
 class NearByComplaintsScreen extends StatefulWidget {
-
   final double? highlightLat;
   final double? highlightLng;
 
@@ -18,92 +19,23 @@ class NearByComplaintsScreen extends StatefulWidget {
   });
 
   @override
-  State<NearByComplaintsScreen> createState() =>
-      NearByComplaintsScreenState();
+  State<NearByComplaintsScreen> createState() => NearByComplaintsScreenState();
 }
 
 class NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
-  DateTime? _lastFetchTime;
   final Color navyBlue = const Color(0xFF0D3B66);
   int? _selectedMarkerIndex;
   int? _highlightIndex;
   bool _mapReady = false;
   final MapController _mapController = MapController();
 
-  List<Map<String, dynamic>> _complaints = [];
-  bool _isLoadingComplaints = true;
-
   @override
   void initState() {
     super.initState();
-    fetchNearbyComplaints();
   }
 
-  // ================= FETCH COMMUNITY COMPLAINTS =================
-
-  Future<void> fetchNearbyComplaints({bool forceRefresh = false}) async {
-    if (!forceRefresh &&
-        _lastFetchTime != null &&
-        DateTime.now().difference(_lastFetchTime!).inSeconds < 30) {
-      return;
-    }
-
-    setState(() => _isLoadingComplaints = true);
-
-    final supabase = Supabase.instance.client;
-
-    try {
-      final userLocation = await _getUserLocation();
-      if (userLocation == null) {
-        setState(() => _isLoadingComplaints = false);
-        return;
-      }
-
-      const double radiusInDegrees = 0.05; // ~5km
-
-      final minLat = userLocation.latitude - radiusInDegrees;
-      final maxLat = userLocation.latitude + radiusInDegrees;
-      final minLng = userLocation.longitude - radiusInDegrees;
-      final maxLng = userLocation.longitude + radiusInDegrees;
-
-      final response = await supabase
-          .from('complaints')
-          .select('''
-          complaint_id,
-          category,
-          description,
-          latitude,
-          longitude,
-          upvotes(count)
-        ''')
-          .eq('complaint_type', 'community')
-          .gte('latitude', minLat)
-          .lte('latitude', maxLat)
-          .gte('longitude', minLng)
-          .lte('longitude', maxLng);
-
-      setState(() {
-        _complaints = response.map<Map<String, dynamic>>((c) {
-          return {
-            "id": c['complaint_id'],
-            "title": c['category'],
-            "description": c['description'],
-            "upvotes": (c['upvotes'] as List).isNotEmpty
-                ? c['upvotes'][0]['count']
-                : 0,
-            "point": LatLng(
-              (c['latitude'] as num).toDouble(),
-              (c['longitude'] as num).toDouble(),
-            ),
-          };
-        }).toList();
-
-        _lastFetchTime = DateTime.now();
-        _isLoadingComplaints = false;
-      });
-    } catch (e) {
-      setState(() => _isLoadingComplaints = false);
-    }
+  void refreshMap() {
+    setState(() {});
   }
 
   // get user location
@@ -135,60 +67,61 @@ class NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
     _mapController.move(userLocation, 15.0);
   }
 
-
   void _focusHighlightedComplaint() {
-  if (!_mapReady) return;
+    if (!_mapReady) return;
 
-  if (widget.highlightLat == null || widget.highlightLng == null) return;
+    if (widget.highlightLat == null || widget.highlightLng == null) return;
 
-  for (int i = 0; i < _complaints.length; i++) {
-    final point = _complaints[i]['point'];
+    final complaints = context.read<ComplaintProvider>().nearbyComplaints;
 
-    if ((point.latitude - widget.highlightLat!).abs() < 0.0001 &&
-        (point.longitude - widget.highlightLng!).abs() < 0.0001) {
+    for (int i = 0; i < complaints.length; i++) {
+      final point = complaints[i]['point'];
 
-      setState(() {
-        _highlightIndex = i;
-        _selectedMarkerIndex = i;
-      });
+      if ((point.latitude - widget.highlightLat!).abs() < 0.0001 &&
+          (point.longitude - widget.highlightLng!).abs() < 0.0001) {
+        setState(() {
+          _highlightIndex = i;
+          _selectedMarkerIndex = i;
+        });
 
-      _mapController.move(point, 16);
+        _mapController.move(point, 16);
 
-      Future.delayed(const Duration(seconds: 7), () {
-        if (mounted) {
-          setState(() => _highlightIndex = null);
-        }
-      });
+        Future.delayed(const Duration(seconds: 7), () {
+          if (mounted) {
+            setState(() => _highlightIndex = null);
+          }
+        });
 
-      break;
+        break;
+      }
     }
   }
-}
-void focusComplaint(double lat, double lng) {
 
-  for (int i = 0; i < _complaints.length; i++) {
-    final point = _complaints[i]['point'];
+  void focusComplaint(double lat, double lng) {
+    final complaints = context.read<ComplaintProvider>().nearbyComplaints;
 
-    if ((point.latitude - lat).abs() < 0.0001 &&
-        (point.longitude - lng).abs() < 0.0001) {
+    for (int i = 0; i < complaints.length; i++) {
+      final point = complaints[i]['point'];
 
-      setState(() {
-        _highlightIndex = i;
-        _selectedMarkerIndex = i;
-      });
+      if ((point.latitude - lat).abs() < 0.0001 &&
+          (point.longitude - lng).abs() < 0.0001) {
+        setState(() {
+          _highlightIndex = i;
+          _selectedMarkerIndex = i;
+        });
 
-      _mapController.move(point, 16);
+        _mapController.move(point, 16);
 
-      Future.delayed(const Duration(seconds: 7), () {
-        if (mounted) {
-          setState(() => _highlightIndex = null);
-        }
-      });
+        Future.delayed(const Duration(seconds: 7), () {
+          if (mounted) {
+            setState(() => _highlightIndex = null);
+          }
+        });
 
-      break;
+        break;
+      }
     }
   }
-}
 
   // ================= UPVOTE LOGIC =================
 
@@ -208,7 +141,9 @@ void focusComplaint(double lat, double lng) {
         context,
       ).showSnackBar(const SnackBar(content: Text("Upvoted successfully")));
 
-      fetchNearbyComplaints(); // Refresh list
+      context
+          .read<ComplaintProvider>()
+          .updateNearbyComplaints(); // Refresh list
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -221,82 +156,80 @@ void focusComplaint(double lat, double lng) {
 
   @override
   Widget build(BuildContext context) {
+    final complaints = context.watch<ComplaintProvider>().nearbyComplaints;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
         children: [
-          _isLoadingComplaints
-              ? const Center(child: CircularProgressIndicator())
-              : FlutterMap(
-                  mapController: _mapController,
-                  options: MapOptions(
-                    initialZoom: 10.0,
-                    minZoom: 7.0,
-                    onTap: (_, _) =>
-                        setState(() => _selectedMarkerIndex = null),
-                    onMapReady: () async {
-    _mapReady = true;
+          FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialZoom: 10.0,
+              minZoom: 7.0,
+              onTap: (_, _) => setState(() => _selectedMarkerIndex = null),
+              onMapReady: () async {
+                _mapReady = true;
 
-    await _moveToCurrentLocation();
+                await _moveToCurrentLocation();
 
-    _focusHighlightedComplaint();
-  },
-                  ),
-                  children: [
-                    TileLayer(
-                      urlTemplate:
-                          'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-                      subdomains: const ['a', 'b', 'c'],
-                      userAgentPackageName: 'com.complaintapp.flutter_map',
+                _focusHighlightedComplaint();
+              },
+            ),
+            children: [
+              TileLayer(
+                urlTemplate:
+                    'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+                subdomains: const ['a', 'b', 'c'],
+                userAgentPackageName: 'com.complaintapp.flutter_map',
+              ),
+
+              CurrentLocationLayer(
+                style: const LocationMarkerStyle(
+                  marker: DefaultLocationMarker(
+                    color: Color.fromARGB(255, 22, 119, 199),
+                    child: Icon(
+                      Icons.navigation,
+                      color: Colors.white,
+                      size: 14,
                     ),
+                  ),
+                  markerSize: Size(30, 30),
+                ),
+              ),
 
-                    CurrentLocationLayer(
-                      style: const LocationMarkerStyle(
-                        marker: DefaultLocationMarker(
-                          color: Color.fromARGB(255, 22, 119, 199),
-                          child: Icon(
-                            Icons.navigation,
-                            color: Colors.white,
-                            size: 14,
-                          ),
+              MarkerLayer(
+                markers: complaints.asMap().entries.map((entry) {
+                  int index = entry.key;
+                  var data = entry.value;
+
+                  return Marker(
+                    point: data['point'],
+                    width: 35,
+                    height: 35,
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedMarkerIndex = _selectedMarkerIndex == index
+                              ? null
+                              : index;
+                        });
+                      },
+                      child: AnimatedScale(
+                        duration: const Duration(milliseconds: 300),
+                        scale: _highlightIndex == index ? 1.5 : 1.0,
+                        child: SvgPicture.asset(
+                          'assets/marker.svg',
+                          width: _highlightIndex == index ? 45 : 35,
+                          height: _highlightIndex == index ? 45 : 35,
                         ),
-                        markerSize: Size(30, 30),
                       ),
                     ),
-
-                    MarkerLayer(
-                      markers: _complaints.asMap().entries.map((entry) {
-                        int index = entry.key;
-                        var data = entry.value;
-
-                        return Marker(
-                          point: data['point'],
-                          width: 35,
-                          height: 35,
-                          child: GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _selectedMarkerIndex =
-                                    _selectedMarkerIndex == index
-                                    ? null
-                                    : index;
-                              });
-                            },
-                           child: AnimatedScale(
-  duration: const Duration(milliseconds: 300),
-  scale: _highlightIndex == index ? 1.5 : 1.0,
-  child: SvgPicture.asset(
-    'assets/marker.svg',
-    width: _highlightIndex == index ? 45 : 35,
-    height: _highlightIndex == index ? 45 : 35,
-  ),
-),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ],
-                ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
 
           Positioned(
             bottom: 40,
@@ -313,7 +246,7 @@ void focusComplaint(double lat, double lng) {
               bottom: 20,
               left: 20,
               right: 20,
-              child: _buildComplaintPopup(_complaints[_selectedMarkerIndex!]),
+              child: _buildComplaintPopup(complaints[_selectedMarkerIndex!]),
             ),
         ],
       ),
@@ -331,7 +264,7 @@ void focusComplaint(double lat, double lng) {
         boxShadow: [
           BoxShadow(
             // ignore: deprecated_member_use
-            color: Colors.black.withValues(alpha:0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 10,
             spreadRadius: 2,
             offset: const Offset(0, 4),

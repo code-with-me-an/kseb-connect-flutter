@@ -22,10 +22,8 @@ class _MainLayoutState extends State<MainLayout> {
 
   int _currentIndex = 0;
   bool showAbout = false;
-
   List<Map<String, dynamic>> userNotifications = [];
   bool loadingNotifications = false;
-
   final GlobalKey<NearByComplaintsScreenState> mapKey =
       GlobalKey<NearByComplaintsScreenState>();
 
@@ -314,7 +312,7 @@ class _MainLayoutState extends State<MainLayout> {
           });
 
           if (index == 2) {
-            mapKey.currentState?.fetchNearbyComplaints();
+            mapKey.currentState?.refreshMap();
           }
         },
         items: const [

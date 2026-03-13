@@ -10,6 +10,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
 import 'package:provider/provider.dart';
 import '../providers/user_data_provider.dart';
+import 'package:geocoding/geocoding.dart';
 
 class ReportComplaintScreen extends StatefulWidget {
   const ReportComplaintScreen({super.key});
@@ -32,6 +33,28 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
   bool _isMapLoading = true;
   bool submitting = false;
   LatLng? _cachedLocation;
+
+  // generate the location name
+
+  Future<String?> getLocationName(double lat, double lng) async {
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(lat, lng);
+
+      if (placemarks.isNotEmpty) {
+        final place = placemarks.first;
+
+        return [
+          place.subLocality,
+          place.locality,
+          place.administrativeArea,
+        ].where((e) => e != null && e.isNotEmpty).join(", ");
+      }
+    } catch (e) {
+      debugPrint("Geocoding error: $e");
+    }
+
+    return null;
+  }
 
   // generate unique tracking code for each complaint
 
@@ -214,6 +237,7 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
     String? consumerId,
     double? latitude,
     double? longitude,
+    String? locationName,
   }) async {
     final user = supabase.auth.currentUser;
     String trackingCode = generateTrackingCode();
@@ -239,6 +263,10 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
       await _findNearestSection();
     }
 
+    if (latitude != null && longitude != null) {
+      locationName = await getLocationName(latitude, longitude);
+    }
+
     if (complaintType == 'personal' && _selectedSectionId == null) {
       throw Exception("Please select consumer connection");
     }
@@ -256,6 +284,7 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
             'consumer_id': complaintType == 'personal' ? consumerId : null,
             'latitude': latitude,
             'longitude': longitude,
+            'location_name': locationName,
             'image_url': imageUrl,
           })
           .select()

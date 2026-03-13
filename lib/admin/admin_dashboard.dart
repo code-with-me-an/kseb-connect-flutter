@@ -71,7 +71,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
       await supabase.from('notifications').insert({
         'recipient_type': 'section',
-        'section_id': sectionId,
+        'section_id': sectionId.toString(),
         'title': _titleController.text.trim(),
         'message': _messageController.text.trim(),
         'is_read': false,

@@ -1,49 +1,92 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
-import 'dart:math';
+
+import '../services/location_service.dart';
+import '../services/realtime_service.dart';
 
 class HomeProvider extends ChangeNotifier {
   final supabase = Supabase.instance.client;
 
   String userName = "User";
-  String locationName = "";
+  String locationName = "Unknown";
   bool loading = true;
 
   List<Map<String, dynamic>> notifications = [];
-  List<Map<String, dynamic>> nearbyComplaints = [];
 
-  RealtimeChannel? notificationChannel;
+  /// store user sections
+  List<String> userSectionIds = [];
 
-  Future<void> loadHomeData() async {
+  bool _realtimeConnected = false;
+
+  // =====================================================
+  // LOAD HOME DATA
+  // =====================================================
+
+  Future<void> loadHomeData({bool forceRefresh = false}) async {
     loading = true;
     notifyListeners();
 
     final user = supabase.auth.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      loading = false;
+      return;
+    }
 
     try {
-      Position position = await Geolocator.getCurrentPosition();
-
       final results = await Future.wait([
         _fetchUserName(user.id),
         _fetchLocation(),
         _fetchNotifications(user.id),
       ]);
 
-      await _fetchNearbyComplaints(position);
-
       userName = results[0] as String;
       locationName = results[1] as String;
       notifications = results[2] as List<Map<String, dynamic>>;
+
+      /// start realtime listener
+      _connectRealtime();
     } catch (e) {
-      debugPrint(e.toString());
+      debugPrint("Home load error: $e");
     }
 
     loading = false;
     notifyListeners();
   }
+
+  // =====================================================
+  // CONNECT REALTIME
+  // =====================================================
+
+  void _connectRealtime() {
+    if (_realtimeConnected) return;
+
+    _realtimeConnected = true;
+
+    RealtimeService.onNotification = (notification) {
+      final sectionId = notification['section_id']?.toString();
+
+      if (!userSectionIds.contains(sectionId)) return;
+
+      /// avoid duplicate notifications
+      final exists = notifications.any(
+        (n) => n['notification_id'] == notification['notification_id'],
+      );
+
+      if (exists) return;
+
+      notifications = [
+        Map<String, dynamic>.from(notification),
+        ...notifications,
+      ];
+
+      notifyListeners();
+    };
+  }
+
+  // =====================================================
+  // FETCH USER NAME
+  // =====================================================
 
   Future<String> _fetchUserName(String id) async {
     final response = await supabase
@@ -55,8 +98,12 @@ class HomeProvider extends ChangeNotifier {
     return response?['name'] ?? "User";
   }
 
+  // =====================================================
+  // FETCH USER LOCATION
+  // =====================================================
+
   Future<String> _fetchLocation() async {
-    Position position = await Geolocator.getCurrentPosition();
+    final position = await LocationService.getCurrentLocation();
 
     List<Placemark> placemarks = await placemarkFromCoordinates(
       position.latitude,
@@ -66,6 +113,10 @@ class HomeProvider extends ChangeNotifier {
     return placemarks.first.locality ?? "Unknown";
   }
 
+  // =====================================================
+  // FETCH NOTIFICATIONS
+  // =====================================================
+
   Future<List<Map<String, dynamic>>> _fetchNotifications(String id) async {
     final connections = await supabase
         .from('consumer_connections')
@@ -74,120 +125,16 @@ class HomeProvider extends ChangeNotifier {
 
     if (connections.isEmpty) return [];
 
-    final sectionIds = connections.map((c) => c['section_id']).toList();
-
-    // Start realtime listener
-    listenToNotifications(sectionIds);
+    userSectionIds = connections
+        .map((c) => c['section_id'].toString())
+        .toList();
 
     final response = await supabase
         .from('notifications')
         .select()
-        .inFilter('section_id', sectionIds)
+        .inFilter('section_id', userSectionIds)
         .order('created_at', ascending: false);
 
     return List<Map<String, dynamic>>.from(response);
   }
-
-  void listenToNotifications(List sectionIds) {
-    notificationChannel = supabase
-        .channel('notifications-realtime')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.insert,
-          schema: 'public',
-          table: 'notifications',
-          callback: (payload) {
-            final newNotification = payload.newRecord;
-
-            if (sectionIds.contains(newNotification['section_id'])) {
-              notifications.insert(0, newNotification);
-              notifyListeners();
-            }
-          },
-        )
-        .subscribe();
-  }
-
-  Future<void> _fetchNearbyComplaints(Position userPosition) async {
-    final response = await supabase
-        .from('complaints')
-        .select(
-          'complaint_id, category, latitude, longitude, status, created_at',
-        )
-        .order('created_at', ascending: false);
-
-    nearbyComplaints = [];
-
-    for (var complaint in response) {
-      if (complaint['latitude'] != null && complaint['longitude'] != null) {
-        double distance = calculateDistance(
-          userPosition.latitude,
-          userPosition.longitude,
-          complaint['latitude'].toDouble(),
-          complaint['longitude'].toDouble(),
-        );
-
-        if (distance <= 5) {
-          final locationName = await getLocationName(
-            complaint['latitude'].toDouble(),
-            complaint['longitude'].toDouble(),
-          );
-
-          complaint['distance'] = distance;
-          complaint['locationName'] = locationName;
-
-          nearbyComplaints.add(complaint);
-        }
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    if (notificationChannel != null) {
-      supabase.removeChannel(notificationChannel!);
-    }
-    super.dispose();
-  }
-}
-
-double calculateDistance(
-  double lat1,
-  double lon1,
-  double lat2,
-  double lon2,
-) {
-  const earthRadius = 6371;
-
-  double dLat = (lat2 - lat1) * pi / 180;
-  double dLon = (lon2 - lon1) * pi / 180;
-
-  double a =
-      sin(dLat / 2) * sin(dLat / 2) +
-      cos(lat1 * pi / 180) *
-          cos(lat2 * pi / 180) *
-          sin(dLon / 2) *
-          sin(dLon / 2);
-
-  double c = 2 * atan2(sqrt(a), sqrt(1 - a));
-
-  return earthRadius * c;
-}
-
-Future<String> getLocationName(double lat, double lng) async {
-  try {
-    List<Placemark> placemarks = await placemarkFromCoordinates(lat, lng);
-
-    if (placemarks.isNotEmpty) {
-      final place = placemarks.first;
-
-      return place.locality ??
-          place.subLocality ??
-          place.administrativeArea ??
-          "Unknown";
-    }
-  } catch (e) {
-    debugPrint(e.toString());
-  }
-
-  return "Unknown";
 }
