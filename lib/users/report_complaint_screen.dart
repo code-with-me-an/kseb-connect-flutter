@@ -292,7 +292,7 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
 
       _showSuccessDialog(response['tracking_code']);
     } on PostgrestException catch (e) {
-      // 🔴 UNIQUE constraint violation
+      // UNIQUE constraint violation
       if (e.code == '23505') {
         // Generate new code and retry once
         trackingCode = generateTrackingCode();

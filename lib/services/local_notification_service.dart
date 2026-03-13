@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -48,16 +49,22 @@ class LocalNotificationService {
     required String body,
     String? payload,
   }) async {
-    const AndroidNotificationDetails androidDetails =
-        AndroidNotificationDetails(
-          'kseb_notifications',
-          'KSEB Notifications',
-          icon: '@mipmap/ic_launcher',
-          importance: Importance.max,
-          priority: Priority.high,
-        );
+    AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      'kseb_notifications',
+      'KSEB Notifications',
+      channelDescription: 'Notifications for complaints and alerts',
 
-    const NotificationDetails notificationDetails = NotificationDetails(
+      icon: '@drawable/kseb_notification_icon',
+
+      importance: Importance.max,
+      priority: Priority.high,
+
+      color: const Color(0xFF0D3B66),
+
+      styleInformation: const BigTextStyleInformation(''),
+    );
+
+    NotificationDetails notificationDetails = NotificationDetails(
       android: androidDetails,
     );
 

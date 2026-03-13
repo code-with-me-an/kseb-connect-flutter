@@ -25,8 +25,6 @@ class _MainLayoutState extends State<MainLayout> {
 
   int _currentIndex = 0;
   bool showAbout = false;
-  List<Map<String, dynamic>> userNotifications = [];
-  bool loadingNotifications = false;
   final GlobalKey<NearByComplaintsScreenState> mapKey =
       GlobalKey<NearByComplaintsScreenState>();
 
@@ -84,208 +82,9 @@ class _MainLayoutState extends State<MainLayout> {
     mapKey.currentState?.focusComplaint(lat, lng);
   }
 
-  String _formatTime(String? timestamp) {
-    if (timestamp == null) return "";
+  
 
-    final time = DateTime.parse(timestamp).toLocal();
-    final difference = DateTime.now().difference(time);
-
-    if (difference.inMinutes < 60) {
-      return "${difference.inMinutes} min ago";
-    } else if (difference.inHours < 24) {
-      return "${difference.inHours} hrs ago";
-    } else {
-      return "${difference.inDays} days ago";
-    }
-  }
-
-  Future<void> _fetchUserNotifications() async {
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
-
-    setState(() {
-      loadingNotifications = true;
-    });
-
-    try {
-      final response = await supabase
-          .from('notifications')
-          .select('''
-          *,
-          complaints (
-            tracking_code
-          )
-        ''')
-          .eq('recipient_type', 'user')
-          .eq('user_id', user.id)
-          .order('created_at', ascending: false);
-
-      userNotifications = List<Map<String, dynamic>>.from(response);
-    } catch (e) {
-      debugPrint(e.toString());
-    }
-
-    setState(() {
-      loadingNotifications = false;
-    });
-  }
-
-  void _showNotifications(BuildContext context) {
-    bool showAllNotifications = false;
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            final notificationsToShow = showAllNotifications
-                ? userNotifications
-                : userNotifications.take(3).toList();
-
-            return Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Container(
-                constraints: const BoxConstraints(maxHeight: 420),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    /// HEADER
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          "Notifications",
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () => Navigator.pop(context),
-                          child: const Icon(Icons.close, color: Colors.grey),
-                        ),
-                      ],
-                    ),
-
-                    const Divider(height: 30),
-
-                    /// CONTENT
-                    Expanded(
-                      child: loadingNotifications
-                          ? const Center(child: CircularProgressIndicator())
-                          : userNotifications.isEmpty
-                          ? const Center(
-                              child: Text(
-                                "No notifications",
-                                style: TextStyle(color: Colors.grey),
-                              ),
-                            )
-                          : SingleChildScrollView(
-                              child: Column(
-                                children: notificationsToShow.map((notif) {
-                                  final trackingCode =
-                                      notif['complaints']?['tracking_code'];
-
-                                  final subtitleText = trackingCode != null
-                                      ? "${notif['message']} (Tracking: $trackingCode)"
-                                      : notif['message'] ?? "";
-                                  return Padding(
-                                    padding: const EdgeInsets.only(bottom: 15),
-                                    child: _buildNotificationItem(
-                                      icon: Icons.notifications,
-                                      color: notif['is_alert'] == true
-                                          ? Colors.orange
-                                          : Colors.blue,
-                                      title: notif['title'] ?? "Notification",
-                                      subtitle: subtitleText,
-                                      time: _formatTime(notif['created_at']),
-                                    ),
-                                  );
-                                }).toList(),
-                              ),
-                            ),
-                    ),
-
-                    /// TOGGLE BUTTON
-                    if (userNotifications.length > 3)
-                      Center(
-                        child: TextButton(
-                          onPressed: () {
-                            setDialogState(() {
-                              showAllNotifications = !showAllNotifications;
-                            });
-                          },
-                          child: Text(
-                            showAllNotifications
-                                ? "Hide Notifications"
-                                : "View All Notifications",
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildNotificationItem({
-    required IconData icon,
-    required Color color,
-    required String title,
-    required String subtitle,
-    required String time,
-  }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, color: color, size: 20),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: TextStyle(fontSize: 12, color: Colors.grey[700]),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                time,
-                style: const TextStyle(fontSize: 10, color: Colors.grey),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
+  
 
   @override
   Widget build(BuildContext context) {
@@ -308,8 +107,10 @@ class _MainLayoutState extends State<MainLayout> {
           IconButton(
             icon: const Icon(Icons.notifications_none, color: Colors.white),
             onPressed: () async {
-              await _fetchUserNotifications();
-              _showNotifications(context);
+              Navigator.pushNamed(
+                context,
+                '/notification',
+              );
             },
           ),
           const SizedBox(width: 8),
