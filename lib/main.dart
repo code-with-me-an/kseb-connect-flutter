@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 
+import 'providers/section_provider.dart';
 import 'user_login_screen.dart';
 import 'users/main_layout.dart';
 import 'admin/main_layout.dart';
@@ -47,10 +48,7 @@ Future<void> main() async {
         arguments: payload,
       );
     } else {
-      navigatorKey.currentState?.pushNamed(
-        "/notification",
-        arguments: payload,
-      );
+      navigatorKey.currentState?.pushNamed("/notification", arguments: payload);
     }
   });
 
@@ -64,6 +62,9 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => HomeProvider()),
         ChangeNotifierProvider(
           create: (_) => ComplaintProvider()..loadComplaints(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => SectionProvider()..loadSections(),
         ),
       ],
       child: const MyApp(),
@@ -79,7 +80,6 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-
   Widget? _startScreen;
 
   @override
@@ -91,7 +91,6 @@ class _MyAppState extends State<MyApp> {
   /// Decide whether to open
   /// Admin UI, User UI, or Login
   Future<void> _decideStartScreen() async {
-
     final prefs = await SharedPreferences.getInstance();
 
     /// ADMIN SESSION
@@ -102,17 +101,12 @@ class _MyAppState extends State<MyApp> {
     final userLoggedIn = keepSignedIn && supabase.auth.currentUser != null;
 
     if (isAdminLoggedIn) {
-
       /// Admin interface
       _startScreen = const AdminLayout();
-
     } else if (userLoggedIn) {
-
       /// User interface
       _startScreen = const MainLayout();
-
     } else {
-
       /// Login screen
       _startScreen = const LoginScreen();
     }
@@ -124,14 +118,12 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       navigatorKey: navigatorKey,
 
       /// App routes
       routes: {
-
         /// User notification screen
         "/notification": (context) => const NotificationDetailScreen(),
 
@@ -140,12 +132,9 @@ class _MyAppState extends State<MyApp> {
       },
 
       /// Start screen
-      home: _startScreen ??
-          const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
-          ),
+      home:
+          _startScreen ??
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
     );
   }
 }

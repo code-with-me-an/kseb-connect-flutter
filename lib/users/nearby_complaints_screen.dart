@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 import '../providers/complaint_provider.dart';
+import '../providers/section_provider.dart';
 
 class NearByComplaintsScreen extends StatefulWidget {
   final double? highlightLat;
@@ -28,6 +29,7 @@ class NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
   int? _highlightIndex;
   bool _mapReady = false;
   final MapController _mapController = MapController();
+  Map<String, dynamic>? _selectedSection;
 
   @override
   void initState() {
@@ -157,6 +159,7 @@ class NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
   @override
   Widget build(BuildContext context) {
     final complaints = context.watch<ComplaintProvider>().nearbyComplaints;
+    final sections = context.watch<SectionProvider>().sections;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -228,6 +231,44 @@ class NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
                   );
                 }).toList(),
               ),
+
+              MarkerLayer(
+                markers: sections.map((section) {
+                  return Marker(
+                    point: section['point'],
+                    width: 40,
+                    height: 40,
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedSection = section;
+                          _selectedMarkerIndex =
+                              null; // Close complaint popup if open
+                        });
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black26,
+                              blurRadius: 4,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                          border: Border.all(color: Colors.green, width: 2),
+                        ),
+                        child: const Icon(
+                          Icons.business, // Or Icons.corporate_fare_rounded
+                          color: Colors.green,
+                          size: 22,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
             ],
           ),
 
@@ -248,8 +289,150 @@ class NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
               right: 20,
               child: _buildComplaintPopup(complaints[_selectedMarkerIndex!]),
             ),
+
+          if (_selectedSection != null)
+            Positioned(
+              bottom: 20,
+              left: 20,
+              right: 20,
+              child: _buildSectionPopup(_selectedSection!),
+            ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSectionPopup(Map<String, dynamic> data) {
+    return Container(
+      padding: const EdgeInsets.all(0), // Remove padding to allow header color
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Bar
+          Container(
+            color: Colors.green.shade700,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  "OFFICE DETAILS",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                    fontSize: 12,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => setState(() => _selectedSection = null),
+                  child: const Icon(Icons.close, color: Colors.white, size: 20),
+                ),
+              ],
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  data['name'],
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 20,
+                    color: Color(0xFF0D3B66),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "Section Code: ${data['code']}",
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const Divider(height: 24),
+
+                // Info Rows
+                _buildInfoRow(
+                  Icons.account_tree_outlined,
+                  "Division",
+                  data['division'],
+                ),
+                const SizedBox(height: 8),
+                _buildInfoRow(Icons.phone_android, "Contact", data['phone']),
+                const SizedBox(height: 8),
+                _buildInfoRow(
+                  Icons.location_on_outlined,
+                  "Address",
+                  data['address'],
+                ),
+
+                const SizedBox(height: 16),
+
+                // Action Button
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      // Add dialer logic here if needed
+                    },
+                    icon: const Icon(Icons.call, size: 18),
+                    label: const Text("CONTACT OFFICE"),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.green.shade700,
+                      side: BorderSide(color: Colors.green.shade700),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Helper widget for the popup rows
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: Colors.grey.shade700),
+        const SizedBox(width: 8),
+        Expanded(
+          child: RichText(
+            text: TextSpan(
+              style: const TextStyle(color: Colors.black87, fontSize: 14),
+              children: [
+                TextSpan(
+                  text: "$label: ",
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                TextSpan(text: value),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
