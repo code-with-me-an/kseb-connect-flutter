@@ -215,7 +215,6 @@ class _AdminNotificationScreenState extends State<AdminNotificationScreen> {
   Widget build(BuildContext context) {
     const darkGreen = Color(0xFF219869);
     const background = Color(0xFFF5F6F8);
-    const iconBg = Color(0xFFEAF4FC);
 
     return Scaffold(
       backgroundColor: background,
