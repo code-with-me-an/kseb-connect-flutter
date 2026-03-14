@@ -290,6 +290,18 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
           .select()
           .single();
 
+      // send notification to section officer
+
+      await supabase.from('notifications').insert({
+        'complaint_id': response['complaint_id'],
+        'recipient_type': 'officer',
+        'section_id': _selectedSectionId,
+        'title': 'New Complaint Registered',
+        'message':
+            'Complaint ${response['tracking_code']} has been registered.',
+        
+      });
+
       _showSuccessDialog(response['tracking_code']);
     } on PostgrestException catch (e) {
       // UNIQUE constraint violation
@@ -314,6 +326,17 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
             })
             .select()
             .single();
+
+        // send notification to section officer
+
+        await supabase.from('notifications').insert({
+          'complaint_id': response['complaint_id'],
+          'recipient_type': 'officer',
+          'section_id': _selectedSectionId,
+          'title': 'New Complaint Registered',
+          'message':
+              'Complaint ${response['tracking_code']} has been registered.',
+        });
 
         _showSuccessDialog(response['tracking_code']);
       } else {
@@ -648,7 +671,11 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
                     child: Stack(
                       children: [
                         _isMapLoading
-                            ? const Center(child: CircularProgressIndicator(color: Color(0xFF0D3B66),))
+                            ? const Center(
+                                child: CircularProgressIndicator(
+                                  color: Color(0xFF0D3B66),
+                                ),
+                              )
                             : FlutterMap(
                                 mapController: _mapController,
                                 options: MapOptions(

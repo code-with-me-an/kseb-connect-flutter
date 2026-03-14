@@ -360,35 +360,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   ),
                   const SizedBox(height: 15),
 
-                  //Alert Checkbox
-                  Row(
-                    children: [
-                      SizedBox(
-                        height: 24,
-                        width: 24,
-                        child: Checkbox(
-                          value: isImportantAlert,
-                          activeColor: greenColor, 
-                          onChanged: (val) {
-                            setState(() => isImportantAlert = val ?? false);
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        "Alert (Mark as important)",
-                        style: TextStyle(
-                          color: Colors.grey[700],
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
                   // expire dropdown
-                  // Custom structure adapted from ReportComplaintScreen
+        
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -456,6 +429,34 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       ),
                     ),
 
+                  const SizedBox(height: 20),
+
+
+                   //Alert Checkbox
+                  Row(
+                    children: [
+                      SizedBox(
+                        height: 24,
+                        width: 24,
+                        child: Checkbox(
+                          value: isImportantAlert,
+                          activeColor: greenColor, 
+                          onChanged: (val) {
+                            setState(() => isImportantAlert = val ?? false);
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        "Alert (Mark as important)",
+                        style: TextStyle(
+                          color: Colors.grey[700],
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 20),
 
                   // Send Button

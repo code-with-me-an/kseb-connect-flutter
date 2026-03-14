@@ -63,6 +63,8 @@ class _MainLayoutState extends State<MainLayout> {
           callback: (payload) {
             final data = payload.newRecord;
 
+            if (data['recipient_type'] != 'user') return;
+
             LocalNotificationService.showNotification(
               title: data['title'] ?? "Notification",
               body: data['message'] ?? "",
@@ -81,10 +83,6 @@ class _MainLayoutState extends State<MainLayout> {
 
     mapKey.currentState?.focusComplaint(lat, lng);
   }
-
-  
-
-  
 
   @override
   Widget build(BuildContext context) {
@@ -107,10 +105,7 @@ class _MainLayoutState extends State<MainLayout> {
           IconButton(
             icon: const Icon(Icons.notifications_none, color: Colors.white),
             onPressed: () async {
-              Navigator.pushNamed(
-                context,
-                '/notification',
-              );
+              Navigator.pushNamed(context, '/notification');
             },
           ),
           const SizedBox(width: 8),

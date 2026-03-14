@@ -65,6 +65,11 @@ class HomeProvider extends ChangeNotifier {
     _realtimeConnected = true;
 
     RealtimeService.onNotification = (notification) {
+
+      // only section announcement reach the user
+      
+      if (notification['recipient_type'] != 'section') return;
+
       final sectionId = notification['section_id']?.toString();
 
       if (!userSectionIds.contains(sectionId)) return;
@@ -138,6 +143,7 @@ class HomeProvider extends ChangeNotifier {
     final response = await supabase
         .from('notifications')
         .select()
+        .eq('recipient_type', 'section')
         .inFilter('section_id', userSectionIds)
         .gte('expires_at', DateTime.now().toIso8601String())
         .order('created_at', ascending: false);

@@ -143,13 +143,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   // 1. Profile Header Section
                   Row(
                     children: [
-                      // --- CHANGED: SVG Profile Icon ---
-                      ClipOval(
-                        child: SvgPicture.asset(
-                          'assets/profile.svg', // Your SVG file path
-                          width: 70, // Equivalent to radius 35 * 2
-                          height: 70,
-                          fit: BoxFit.cover,
+                      // profile icon 
+                      CircleAvatar(
+                        radius: 40,
+                        backgroundColor: Colors.grey[400],
+                        child: const Icon(
+                          Icons.person,
+                          size: 55,
+                          color: Colors.white,
                         ),
                       ),
 

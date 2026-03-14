@@ -1,4 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../services/local_notification_service.dart';
 
 class RealtimeService {
   static final supabase = Supabase.instance.client;
@@ -35,6 +37,7 @@ class RealtimeService {
         }
       },
     );
+
     _channel!.onPostgresChanges(
       event: PostgresChangeEvent.update,
       schema: 'public',
@@ -73,11 +76,27 @@ class RealtimeService {
       event: PostgresChangeEvent.insert,
       schema: 'public',
       table: 'notifications',
-      callback: (payload) {
+      callback: (payload) async {
         final data = payload.newRecord;
 
         if (onNotification != null) {
           onNotification!(data);
+        }
+
+        /// ADMIN PHONE NOTIFICATION
+        final prefs = await SharedPreferences.getInstance();
+        final sectionId = prefs.getString('admin_section_id');
+
+        if (sectionId != null &&
+            data['recipient_type'] == 'officer' &&
+            data['section_id'] == sectionId) {
+
+          LocalNotificationService.showNotification(
+            title: data['title'] ?? "New Complaint",
+            body: data['message'] ?? "",
+            isAlert: data['is_alert'] ?? false,
+            payload: data['complaint_id']?.toString(),
+          );
         }
       },
     );

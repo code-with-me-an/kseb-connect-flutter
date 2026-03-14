@@ -4,14 +4,23 @@ import 'package:kseb_connect/providers/home_provider.dart';
 import 'package:kseb_connect/services/realtime_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 
 import 'user_login_screen.dart';
 import 'users/main_layout.dart';
 import 'admin/main_layout.dart';
-import 'package:provider/provider.dart';
+
 import 'providers/user_data_provider.dart';
 import 'services/local_notification_service.dart';
+
 import 'users/notification_detail_screen.dart';
+import 'admin/admin_notification_screen.dart';
+
+/// Global navigator key
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+/// Global Supabase client
+final supabase = Supabase.instance.client;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,14 +29,32 @@ Future<void> main() async {
     url: 'https://ozfkdvalelvgrygihqxr.supabase.co',
     anonKey: 'sb_publishable_XVYY0q-iNacej703cOQmqA_vZ9PBryl',
   );
+
+  /// Start realtime system
   RealtimeService.start();
 
-  await LocalNotificationService.initialize((payload) {
+  /// Initialize local notifications
+  await LocalNotificationService.initialize((payload) async {
     if (payload == null) return;
 
-    navigatorKey.currentState?.pushNamed("/notification", arguments: payload);
+    final prefs = await SharedPreferences.getInstance();
+    final isAdmin = prefs.getBool('admin_logged_in') ?? false;
+
+    /// Navigate based on session type
+    if (isAdmin) {
+      navigatorKey.currentState?.pushNamed(
+        "/adminNotification",
+        arguments: payload,
+      );
+    } else {
+      navigatorKey.currentState?.pushNamed(
+        "/notification",
+        arguments: payload,
+      );
+    }
   });
 
+  /// Request notification permission
   await LocalNotificationService.requestPermission();
 
   runApp(
@@ -44,10 +71,6 @@ Future<void> main() async {
   );
 }
 
-// Global Supabase client
-final supabase = Supabase.instance.client;
-final GlobalKey<NavigatorState> navigatorKey = GlobalKey();
-
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
@@ -56,6 +79,7 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+
   Widget? _startScreen;
 
   @override
@@ -64,37 +88,64 @@ class _MyAppState extends State<MyApp> {
     _decideStartScreen();
   }
 
+  /// Decide whether to open
+  /// Admin UI, User UI, or Login
   Future<void> _decideStartScreen() async {
+
     final prefs = await SharedPreferences.getInstance();
 
-    /// 🔹 ADMIN SESSION CHECK
+    /// ADMIN SESSION
     final isAdminLoggedIn = prefs.getBool('admin_logged_in') ?? false;
 
-    /// 🔹 USER SESSION CHECK
+    /// USER SESSION
     final keepSignedIn = prefs.getBool('keepSignedIn') ?? false;
     final userLoggedIn = keepSignedIn && supabase.auth.currentUser != null;
 
     if (isAdminLoggedIn) {
+
+      /// Admin interface
       _startScreen = const AdminLayout();
+
     } else if (userLoggedIn) {
+
+      /// User interface
       _startScreen = const MainLayout();
+
     } else {
+
+      /// Login screen
       _startScreen = const LoginScreen();
     }
 
-    setState(() {});
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+
     return MaterialApp(
-  debugShowCheckedModeBanner: false,
-  navigatorKey: navigatorKey,
-  routes: {
-    "/notification": (context) => const NotificationDetailScreen(),
-  },
-  home: _startScreen ??
-      const Scaffold(body: Center(child: CircularProgressIndicator())),
-);
+      debugShowCheckedModeBanner: false,
+      navigatorKey: navigatorKey,
+
+      /// App routes
+      routes: {
+
+        /// User notification screen
+        "/notification": (context) => const NotificationDetailScreen(),
+
+        /// Admin notification screen
+        "/adminNotification": (context) => const AdminNotificationScreen(),
+      },
+
+      /// Start screen
+      home: _startScreen ??
+          const Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(),
+            ),
+          ),
+    );
   }
 }

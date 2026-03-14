@@ -1,20 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-class NotificationDetailScreen extends StatefulWidget {
-  const NotificationDetailScreen({super.key});
+class AdminNotificationScreen extends StatefulWidget {
+  const AdminNotificationScreen({super.key});
 
   @override
-  State<NotificationDetailScreen> createState() =>
-      _NotificationDetailScreenState();
+  State<AdminNotificationScreen> createState() =>
+      _AdminNotificationScreenState();
 }
 
-class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
+class _AdminNotificationScreenState extends State<AdminNotificationScreen> {
   final supabase = Supabase.instance.client;
-  RealtimeChannel? notificationChannel;
 
   List notifications = [];
-  bool loading = false;
+  bool loading = true;
+
+  RealtimeChannel? channel;
 
   @override
   void initState() {
@@ -22,38 +24,46 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
     fetchNotifications();
   }
 
-  // notification fetching
+  // ==============================
+  // FETCH NOTIFICATIONS
+  // ==============================
 
   Future<void> fetchNotifications() async {
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    final sectionId = prefs.getString('admin_section_id');
 
-    setState(() {
-      loading = true;
-    });
+    if (sectionId == null) return;
 
     try {
       final response = await supabase
           .from('notifications')
           .select('''
-        *,
-        complaints (
-          tracking_code
-        )
-      ''')
-          .eq('recipient_type', 'user')
-          .eq('user_id', user.id)
+            *,
+            complaints (
+              tracking_code,
+              category,
+              description
+            )
+          ''')
+          .eq('recipient_type', 'officer')
+          .eq('section_id', sectionId)
           .order('created_at', ascending: false);
 
-      notifications = List<Map<String, dynamic>>.from(response);
+      setState(() {
+        notifications = List<Map<String, dynamic>>.from(response);
+        loading = false;
+      });
     } catch (e) {
       debugPrint(e.toString());
+      setState(() {
+        loading = false;
+      });
     }
-
-    setState(() {
-      loading = false;
-    });
   }
+
+  // ==============================
+  // FORMAT TIME
+  // ==============================
 
   String formatTime(String? timestamp) {
     if (timestamp == null) return "";
@@ -63,12 +73,51 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
 
     if (difference.inMinutes < 60) {
       return "${difference.inMinutes} min ago";
-    } else if (difference.inHours < 24) {
-      return "${difference.inHours} hrs ago";
-    } else {
-      return "${difference.inDays} days ago";
     }
+
+    if (difference.inHours < 24) {
+      return "${difference.inHours} hrs ago";
+    }
+
+    return "${difference.inDays} days ago";
   }
+
+  // ==============================
+  // DELETE ALL
+  // ==============================
+
+  Future<void> deleteAllNotifications() async {
+    final prefs = await SharedPreferences.getInstance();
+    final sectionId = prefs.getString('admin_section_id');
+
+    if (sectionId == null) return;
+
+    setState(() {
+      loading = true;
+    });
+
+    try {
+      await supabase.from('notifications').delete().eq('section_id', sectionId);
+
+      notifications.clear();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("All notifications deleted")),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error deleting notifications: $e")),
+      );
+    }
+
+    setState(() {
+      loading = false;
+    });
+  }
+
+  // ==============================
+  // UI
+  // ==============================
 
   Future<void> confirmDeleteAll() async {
     showDialog(
@@ -79,8 +128,8 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
             borderRadius: BorderRadius.circular(16),
           ),
           backgroundColor: Colors.white,
-          surfaceTintColor:
-              Colors.transparent, // Removes the slight Material 3 purple tint
+          surfaceTintColor: Colors.transparent,
+
           title: Row(
             children: const [
               Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
@@ -95,23 +144,27 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
               ),
             ],
           ),
+
           content: const Text(
-            "Are you sure you want to delete all your notifications? This action cannot be undone.",
+            "Are you sure you want to delete all notifications? This action cannot be undone.",
             style: TextStyle(
               color: Color(0xFF666666),
               fontSize: 15,
               height: 1.4,
             ),
           ),
+
           actionsPadding: const EdgeInsets.only(
             right: 16,
             bottom: 16,
             left: 16,
           ),
+
           actions: [
+            /// CANCEL
             TextButton(
               onPressed: () {
-                Navigator.pop(context); // close dialog
+                Navigator.pop(context);
               },
               style: TextButton.styleFrom(
                 foregroundColor: const Color(0xFF666666),
@@ -128,13 +181,15 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
                 style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
               ),
             ),
+
+            /// DELETE
             ElevatedButton(
               onPressed: () async {
-                Navigator.pop(context); // close dialog
+                Navigator.pop(context);
                 await deleteAllNotifications();
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red, // Destructive action color
+                backgroundColor: Colors.red,
                 foregroundColor: Colors.white,
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(
@@ -156,68 +211,29 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
     );
   }
 
-  Future<void> deleteAllNotifications() async {
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
-
-    setState(() {
-      loading = true;
-    });
-
-    try {
-      await supabase.from('notifications').delete().eq('user_id', user.id);
-
-      setState(() {
-        notifications.clear();
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("All notifications deleted")),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error deleting notifications: $e")),
-      );
-    }
-
-    setState(() {
-      loading = false;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    // Colors matching the provided UI
-    const Color darkBlueAppBar = Color(0xFF0C3D6A);
-    const Color lightGreyBackground = Color(0xFFF5F6F8);
-    const Color lightBlueIconBg = Color(0xFFEAF4FC);
+    const darkGreen = Color(0xFF219869);
+    const background = Color(0xFFF5F6F8);
+    const iconBg = Color(0xFFEAF4FC);
 
     return Scaffold(
-      backgroundColor: lightGreyBackground,
+      backgroundColor: background,
+
       appBar: AppBar(
-        backgroundColor: darkBlueAppBar,
+        backgroundColor: darkGreen,
         elevation: 0,
         centerTitle: true,
         title: const Text(
           "Notifications",
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-          ),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
         ),
 
-        /// BACK BUTTON (Styled like the reference image)
         leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new,
-            color: Colors.white,
-            size: 20,
-          ),
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
 
-        /// DELETE BUTTON
         actions: [
           IconButton(
             icon: const Icon(Icons.delete_outline, color: Colors.white),
@@ -225,8 +241,9 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
           ),
         ],
       ),
+
       body: RefreshIndicator(
-        color: const Color(0xFF0D3B66),
+        color: const Color(0xFF219869), // green reload color
         onRefresh: fetchNotifications,
         child: loading
             ? ListView(
@@ -234,7 +251,7 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
                 children: const [
                   SizedBox(height: 300),
                   Center(
-                    child: CircularProgressIndicator(color: Color(0xFF0D3B66)),
+                    child: CircularProgressIndicator(color: Color(0xFF219869)),
                   ),
                 ],
               )
@@ -246,7 +263,7 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
                   Center(
                     child: Text(
                       "No notifications",
-                      style: TextStyle(color: Colors.grey, fontSize: 16),
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
                     ),
                   ),
                 ],
@@ -264,9 +281,9 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
 
                   final trackingCode = notif['complaints']?['tracking_code'];
 
-                  final subtitleText = trackingCode != null
+                  final subtitle = trackingCode != null
                       ? "${notif['message']} (Tracking: $trackingCode)"
-                      : notif['message'] ?? "";
+                      : notif['message'];
 
                   return Container(
                     margin: const EdgeInsets.only(bottom: 16),
@@ -291,7 +308,7 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
                           decoration: BoxDecoration(
                             color: isAlert
                                 ? Colors.orange.shade50
-                                : lightBlueIconBg,
+                                : const Color(0xFFEAF4FC),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
@@ -301,7 +318,6 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
                             color: isAlert
                                 ? Colors.orange
                                 : const Color(0xFF3B9CF2),
-                            size: 26,
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -314,12 +330,11 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w700,
-                                  color: Color(0xFF222222),
                                 ),
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                subtitleText,
+                                subtitle ?? "",
                                 style: const TextStyle(
                                   fontSize: 15,
                                   color: Color(0xFF666666),
@@ -332,7 +347,6 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
                                 style: const TextStyle(
                                   fontSize: 13,
                                   color: Color(0xFFAAAAAA),
-                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
                             ],
@@ -349,9 +363,10 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
 
   @override
   void dispose() {
-    if (notificationChannel != null) {
-      supabase.removeChannel(notificationChannel!);
+    if (channel != null) {
+      supabase.removeChannel(channel!);
     }
+
     super.dispose();
   }
 }

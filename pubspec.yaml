@@ -76,7 +76,6 @@ flutter:
   assets:
     - assets/logo.png
     - assets/marker.svg
-    - assets/profile.svg
     - assets/app_icon.png
     - assets/communityicon.svg
     - assets/personalicon.svg
