@@ -341,7 +341,7 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF0D3B66),))
           : RefreshIndicator(
               color: const Color(0xFF0D3B66), // Your theme color
               onRefresh: fetchComplaints, // Calls API again

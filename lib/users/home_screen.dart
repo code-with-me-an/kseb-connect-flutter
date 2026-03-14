@@ -4,6 +4,7 @@ import 'package:kseb_connect/providers/home_provider.dart';
 import 'report_complaint_screen.dart';
 import 'package:provider/provider.dart';
 import 'main_layout.dart';
+import 'package:intl/intl.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -90,11 +91,33 @@ class HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  // date formatting
+
+  String formatAnnouncementTime(String? timeString) {
+    if (timeString == null || timeString.isEmpty) return "";
+
+    final DateTime time = DateTime.parse(timeString).toLocal();
+    final DateTime now = DateTime.now();
+    final difference = now.difference(time);
+
+    if (difference.inMinutes < 1) {
+      return "Just now";
+    } else if (difference.inHours < 1) {
+      return "${difference.inMinutes} min ago";
+    } else if (difference.inDays == 0) {
+      return "Today • ${DateFormat('hh:mm a').format(time)}";
+    } else if (difference.inDays == 1) {
+      return "Yesterday • ${DateFormat('hh:mm a').format(time)}";
+    } else {
+      return DateFormat('dd MMM yyyy').format(time);
+    }
+  }
+
   // --- UI DESIGN ---
   @override
   Widget build(BuildContext context) {
     if (home.loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFF0D3B66),)));
     }
     const orangeColor = Color(0xFFE85842); // For Report Button
     double headerRevealHeight = 200;
@@ -370,19 +393,30 @@ class HomeScreenState extends State<HomeScreen> {
                               )
                             : Column(
                                 children: home.notifications.map((notif) {
+                                  final bool isAlert =
+                                      notif['is_alert'] == true;
+
                                   return Padding(
                                     padding: const EdgeInsets.only(bottom: 12),
                                     child: _buildAlertCard(
-                                      icon: notif['is_alert'] == true
+                                      icon: isAlert
                                           ? Icons.warning_amber_rounded
                                           : Icons.info_outline,
-                                      iconColor: Colors.blue.shade700,
+
+                                      iconColor: isAlert
+                                          ? Colors.red
+                                          : Colors.blue.shade700,
+
                                       title: notif['title'] ?? "Notification",
                                       text: notif['message'] ?? '',
-                                      date: "Today",
+                                      date: formatAnnouncementTime(
+                                        notif['created_at'],
+                                      ),
+
                                       badgeText: notif['is_read'] == false
                                           ? "NEW"
                                           : "OLD",
+
                                       badgeColor: Colors.orange.shade100,
                                       badgeTextColor: Colors.orange.shade800,
                                     ),

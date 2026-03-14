@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -16,6 +17,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
   int pendingCount = 0;
   int inProgressCount = 0;
   int resolvedCount = 0;
+  int expiryDays = 1;
+  DateTime? customExpiryDate;
 
   bool loading = true;
   bool sending = false;
@@ -36,12 +39,39 @@ class _AdminDashboardState extends State<AdminDashboard> {
     fetchComplaintStats();
   }
 
-  @override
-  void dispose() {
-    // Dispose controllers to prevent memory leaks
-    _titleController.dispose();
-    _messageController.dispose();
-    super.dispose();
+  Future<void> pickCustomExpiryDate() async {
+    DateTime today = DateTime.now();
+
+    final DateTime? pickedDate = await showDatePicker(
+      context: context,
+      initialDate: today.add(const Duration(days: 4)),
+      firstDate: today,
+      lastDate: today.add(const Duration(days: 365)),
+      // Theme builder to match the calendar to your app's system style
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: greenColor, // Header background color & active color
+              onPrimary: Colors.white, // Header text color
+              onSurface: textDark, // Body text color
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: greenColor, // Button text color
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (pickedDate != null) {
+      setState(() {
+        customExpiryDate = pickedDate;
+      });
+    }
   }
 
   Future<void> sendAnnouncement() async {
@@ -51,9 +81,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
     if (adminId == null || sectionId == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Admin session missing")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Admin session missing")));
       return;
     }
 
@@ -76,6 +106,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
         'message': _messageController.text.trim(),
         'is_read': false,
         'is_alert': isImportantAlert,
+        'expires_at': DateTime.now()
+            .add(Duration(days: expiryDays))
+            .toIso8601String(),
       });
 
       _titleController.clear();
@@ -83,15 +116,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
       setState(() => isImportantAlert = false); // Reset checkbox
 
       if (!mounted) return;
-      
+
       //Show Custom Success Popup
       showSuccessPopup();
-
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error sending announcement: $e")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error sending announcement: $e")));
     } finally {
       if (mounted) {
         setState(() => sending = false);
@@ -115,11 +147,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
-                  Icons.check_circle,
-                  color: greenColor,
-                  size: 70,
-                ),
+                const Icon(Icons.check_circle, color: greenColor, size: 70),
                 const SizedBox(height: 20),
                 const Text(
                   "Success!",
@@ -133,10 +161,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 const Text(
                   "Announcement sent successfully.",
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.black87,
-                  ),
+                  style: TextStyle(fontSize: 16, color: Colors.black87),
                 ),
                 const SizedBox(height: 25),
                 SizedBox(
@@ -223,7 +248,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
     return Scaffold(
       backgroundColor: backgroundGrey,
       body: loading
-          ? const Center(child: CircularProgressIndicator())
+          // Changed loading indicator color to green
+          ? const Center(child: CircularProgressIndicator(color: greenColor))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(15),
               child: Column(
@@ -292,8 +318,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   // Title TextField
                   TextField(
                     controller: _titleController,
+                    cursorColor: greenColor, // Changed cursor color
                     decoration: InputDecoration(
                       labelText: "Title",
+                      floatingLabelStyle: const TextStyle(color: greenColor), // Changed floating label color
                       hintText: "Enter title",
                       filled: true,
                       fillColor: Colors.white,
@@ -313,8 +341,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   TextField(
                     controller: _messageController,
                     maxLines: 4,
+                    cursorColor: greenColor, // Changed cursor color
                     decoration: InputDecoration(
                       labelText: "Message",
+                      floatingLabelStyle: const TextStyle(color: greenColor), // Changed floating label color
                       hintText: "Enter your message here...",
                       filled: true,
                       fillColor: Colors.white,
@@ -338,7 +368,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         width: 24,
                         child: Checkbox(
                           value: isImportantAlert,
-                          activeColor: greenColor, // Matched with your theme
+                          activeColor: greenColor, 
                           onChanged: (val) {
                             setState(() => isImportantAlert = val ?? false);
                           },
@@ -355,6 +385,77 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 20),
+
+                  // expire dropdown
+                  // Custom structure adapted from ReportComplaintScreen
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(left: 4, bottom: 8),
+                        child: Text(
+                          "Announcement Duration",
+                          style: TextStyle(
+                            color: Colors.grey[700],
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        width: double.infinity,
+                        height: 55,
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<int>(
+                            value: expiryDays,
+                            isExpanded: true, // Prevents overflow
+                            icon: const Icon(Icons.keyboard_arrow_down, color: Colors.grey),
+                            dropdownColor: Colors.white,
+                            borderRadius: BorderRadius.circular(15),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              color: Colors.black87,
+                            ),
+                            items: const [
+                              DropdownMenuItem(value: 1, child: Text("1 Day")),
+                              DropdownMenuItem(value: 2, child: Text("2 Days")),
+                              DropdownMenuItem(value: 3, child: Text("3 Days")),
+                              DropdownMenuItem(value: 0, child: Text("Custom Date")),
+                            ],
+                            onChanged: (val) async {
+                              if (val == 0) {
+                                await pickCustomExpiryDate();
+                              } else {
+                                setState(() {
+                                  expiryDays = val ?? 1;
+                                  customExpiryDate = null;
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  if (customExpiryDate != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: Text(
+                        "Expires on: ${DateFormat('dd MMM yyyy').format(customExpiryDate!)}",
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ),
+
                   const SizedBox(height: 20),
 
                   // Send Button
@@ -451,5 +552,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
         ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    // Dispose controllers to prevent memory leaks
+    _titleController.dispose();
+    _messageController.dispose();
+    super.dispose();
   }
 }

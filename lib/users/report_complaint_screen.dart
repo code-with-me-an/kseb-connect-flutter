@@ -648,7 +648,7 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
                     child: Stack(
                       children: [
                         _isMapLoading
-                            ? const Center(child: CircularProgressIndicator())
+                            ? const Center(child: CircularProgressIndicator(color: Color(0xFF0D3B66),))
                             : FlutterMap(
                                 mapController: _mapController,
                                 options: MapOptions(

@@ -253,7 +253,7 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
         ],
       ),
       body: loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF0D3B66),))
           : notifications.isEmpty
           ? const Center(
               child: Text(

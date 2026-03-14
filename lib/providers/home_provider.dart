@@ -4,6 +4,7 @@ import 'package:geocoding/geocoding.dart';
 
 import '../services/location_service.dart';
 import '../services/realtime_service.dart';
+import '../services/local_notification_service.dart';
 
 class HomeProvider extends ChangeNotifier {
   final supabase = Supabase.instance.client;
@@ -81,6 +82,11 @@ class HomeProvider extends ChangeNotifier {
       ];
 
       notifyListeners();
+      LocalNotificationService.showNotification(
+        title: notification['title'] ?? "Alert",
+        body: notification['message'] ?? "",
+        isAlert: notification['is_alert'] == true,
+      );
     };
   }
 
@@ -133,6 +139,7 @@ class HomeProvider extends ChangeNotifier {
         .from('notifications')
         .select()
         .inFilter('section_id', userSectionIds)
+        .gte('expires_at', DateTime.now().toIso8601String())
         .order('created_at', ascending: false);
 
     return List<Map<String, dynamic>>.from(response);
