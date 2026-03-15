@@ -88,7 +88,7 @@ class NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
 
         _mapController.move(point, 16);
 
-        Future.delayed(const Duration(seconds: 7), () {
+        Future.delayed(const Duration(seconds: 3), () {
           if (mounted) {
             setState(() => _highlightIndex = null);
           }
@@ -114,7 +114,7 @@ class NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
 
         _mapController.move(point, 16);
 
-        Future.delayed(const Duration(seconds: 7), () {
+        Future.delayed(const Duration(seconds: 3), () {
           if (mounted) {
             setState(() => _highlightIndex = null);
           }
@@ -154,12 +154,23 @@ class NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
     }
   }
 
+  double getMarkerSize(double zoom) {
+    if (zoom < 9) return 15;
+    if (zoom < 11) return 20;
+    if (zoom < 13) return 25;
+    if (zoom < 15) return 30;
+    return 40;
+  }
+
   // ================= BUILD =================
 
   @override
   Widget build(BuildContext context) {
     final complaints = context.watch<ComplaintProvider>().nearbyComplaints;
     final sections = context.watch<SectionProvider>().sections;
+
+    double zoom = _mapReady ? _mapController.camera.zoom : 10.0;
+    double markerSize = getMarkerSize(zoom);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -171,20 +182,33 @@ class NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
               initialZoom: 10.0,
               minZoom: 7.0,
               onTap: (_, _) => setState(() => _selectedMarkerIndex = null),
+
+              onPositionChanged: (position, hasGesture) {
+                setState(() {});
+              },
+
               onMapReady: () async {
                 _mapReady = true;
-
                 await _moveToCurrentLocation();
-
                 _focusHighlightedComplaint();
               },
             ),
             children: [
+              // TileLayer(
+              //   urlTemplate:
+              //       "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png",
+              //   subdomains: const ['a', 'b', 'c', 'd'],
+              //   userAgentPackageName: "com.complaintapp.flutter_map",
+              //   maxZoom: 20,
+              // ),
               TileLayer(
                 urlTemplate:
-                    'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-                subdomains: const ['a', 'b', 'c'],
-                userAgentPackageName: 'com.complaintapp.flutter_map',
+                    "https://api.maptiler.com/maps/streets-v4/{z}/{x}/{y}.png?key=6PG81cDlAFK36afvUVNL",
+                tileDimension: 512,
+                zoomOffset: -1,
+                maxZoom: 50,
+                userAgentPackageName: "com.complaintapp.flutter_map",
+                retinaMode: true,
               ),
 
               CurrentLocationLayer(
@@ -208,8 +232,8 @@ class NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
 
                   return Marker(
                     point: data['point'],
-                    width: 35,
-                    height: 35,
+                    width: markerSize,
+                    height: markerSize,
                     child: GestureDetector(
                       onTap: () {
                         setState(() {
@@ -220,11 +244,11 @@ class NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
                       },
                       child: AnimatedScale(
                         duration: const Duration(milliseconds: 300),
-                        scale: _highlightIndex == index ? 1.5 : 1.0,
+                        scale: _highlightIndex == index ? 1.4 : 1.0,
                         child: SvgPicture.asset(
                           'assets/marker.svg',
-                          width: _highlightIndex == index ? 45 : 35,
-                          height: _highlightIndex == index ? 45 : 35,
+                          width: markerSize,
+                          height: markerSize,
                         ),
                       ),
                     ),
@@ -236,14 +260,13 @@ class NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
                 markers: sections.map((section) {
                   return Marker(
                     point: section['point'],
-                    width: 40,
-                    height: 40,
+                    width: markerSize,
+                    height: markerSize,
                     child: GestureDetector(
                       onTap: () {
                         setState(() {
                           _selectedSection = section;
-                          _selectedMarkerIndex =
-                              null; // Close complaint popup if open
+                          _selectedMarkerIndex = null;
                         });
                       },
                       child: Container(
@@ -254,15 +277,15 @@ class NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
                             BoxShadow(
                               color: Colors.black26,
                               blurRadius: 4,
-                              offset: Offset(0, 2),
+                              offset: const Offset(0, 2),
                             ),
                           ],
                           border: Border.all(color: Colors.green, width: 2),
                         ),
-                        child: const Icon(
-                          Icons.business, // Or Icons.corporate_fare_rounded
+                        child: Icon(
+                          Icons.business,
                           color: Colors.green,
-                          size: 22,
+                          size: markerSize * 0.6,
                         ),
                       ),
                     ),

@@ -23,17 +23,18 @@ class _AdminSectionMapScreenState extends State<AdminSectionMapScreen> {
 
   @override
   @override
-void initState() {
-  super.initState();
-  fetchSectionComplaints(forceRefresh: true);
+  void initState() {
+    super.initState();
+    fetchSectionComplaints(forceRefresh: true);
 
-  Future.doWhile(() async {
-    await Future.delayed(const Duration(seconds: 30));
-    if (!mounted) return false;
-    await fetchSectionComplaints(forceRefresh: true);
-    return true;
-  });
-}
+    Future.doWhile(() async {
+      await Future.delayed(const Duration(seconds: 30));
+      if (!mounted) return false;
+      await fetchSectionComplaints(forceRefresh: true);
+      return true;
+    });
+  }
+
   Future<void> fetchSectionComplaints({bool forceRefresh = false}) async {
     if (!forceRefresh &&
         _lastFetchTime != null &&
@@ -82,75 +83,92 @@ void initState() {
                 FlutterMap(
                   mapController: _mapController,
                   options: MapOptions(
-  initialCenter: LatLng(11.2588, 75.7804),
-  initialZoom: 13,
-  onMapReady: () {
-    fetchSectionComplaints(forceRefresh: true);
-  },
-),
+                    initialCenter: LatLng(11.2588, 75.7804),
+                    initialZoom: 13,
+                    onMapReady: () {
+                      fetchSectionComplaints(forceRefresh: true);
+                    },
+                  ),
                   children: [
+                    // TileLayer(
+                    //   urlTemplate:
+                    //       "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png",
+                    //   subdomains: const ['a', 'b', 'c', 'd'],
+                    //   userAgentPackageName: "com.complaintapp.flutter_map",
+                    //   maxZoom: 20,
+                    // ),
                     TileLayer(
                       urlTemplate:
-                          'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-                      subdomains: const ['a', 'b', 'c'],
+                          "https://api.maptiler.com/maps/streets-v4/{z}/{x}/{y}.png?key=6PG81cDlAFK36afvUVNL",
+                      tileDimension: 512,
+                      zoomOffset: -1,
+                      maxZoom: 50,
+                      userAgentPackageName: "com.complaintapp.flutter_map",
+                      retinaMode: true,
                     ),
+                    MarkerLayer(
+                      markers: _complaints
+                          .asMap()
+                          .entries
+                          .map((entry) {
+                            int index = entry.key;
+                            var complaint = entry.value;
 
-    MarkerLayer(
-  markers: _complaints.asMap().entries.map((entry) {
-    int index = entry.key;
-    var complaint = entry.value;
+                            final lat = complaint['latitude'];
+                            final lng = complaint['longitude'];
+                            final type = complaint['complaint_type'];
 
-    final lat = complaint['latitude'];
-    final lng = complaint['longitude'];
-    final type = complaint['complaint_type'];
+                            if (lat == null || lng == null) return null;
 
-    if (lat == null || lng == null) return null;
-
-    return Marker(
-      point: LatLng(
-        double.parse(lat.toString()),
-        double.parse(lng.toString()),
-      ),
-      width: 50,
-      height: 50,
-      child: GestureDetector(
-        onTap: () {
-          setState(() {
-            _selectedMarkerIndex =
-                _selectedMarkerIndex == index ? null : index;
-          });
-        },
-        child: type == 'community'
-            ? Stack(
-                alignment: Alignment.center,
-                children: [
-                  SvgPicture.asset(
-                    'assets/communityicon.svg',
-                    width: 40,
-                    height: 40,
-                  ),
-                  Positioned(
-                    top: 12,
-                    child: Text(
-                      "${complaint['upvote_count'] ?? 0}",
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
+                            return Marker(
+                              point: LatLng(
+                                double.parse(lat.toString()),
+                                double.parse(lng.toString()),
+                              ),
+                              width: 50,
+                              height: 50,
+                              child: GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _selectedMarkerIndex =
+                                        _selectedMarkerIndex == index
+                                        ? null
+                                        : index;
+                                  });
+                                },
+                                child: type == 'community'
+                                    ? Stack(
+                                        alignment: Alignment.center,
+                                        children: [
+                                          SvgPicture.asset(
+                                            'assets/communityicon.svg',
+                                            width: 40,
+                                            height: 40,
+                                          ),
+                                          Positioned(
+                                            top: 12,
+                                            child: Text(
+                                              "${complaint['upvote_count'] ?? 0}",
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 15,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      )
+                                    : SvgPicture.asset(
+                                        "assets/personalicon.svg",
+                                        width: 25,
+                                        height: 25,
+                                      ),
+                              ),
+                            );
+                          })
+                          .whereType<Marker>()
+                          .toList(),
                     ),
-                  ),
-                ],
-              )
-            : SvgPicture.asset(
-                "assets/personalicon.svg",
-                width: 25,
-                height: 25,
-              ),
-      ),
-    );
-  }).whereType<Marker>().toList(),
-),  
                   ],
                 ),
 
@@ -163,100 +181,97 @@ void initState() {
                     child: Text("Complaints: ${_complaints.length}"),
                   ),
                 ),
-                          if (_selectedMarkerIndex != null)
-  Positioned(
-    bottom: 20,
-    left: 20,
-    right: 20,
-    child: _buildComplaintPopup(_complaints[_selectedMarkerIndex!]),
-  ),  
+                if (_selectedMarkerIndex != null)
+                  Positioned(
+                    bottom: 20,
+                    left: 20,
+                    right: 20,
+                    child: _buildComplaintPopup(
+                      _complaints[_selectedMarkerIndex!],
+                    ),
+                  ),
               ],
             ),
-
     );
   }
+
   Widget _buildComplaintPopup(Map<String, dynamic> complaint) {
-
-  return Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withValues(alpha:0.1),
-          blurRadius: 10,
-        )
-      ],
-    ),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              "Tracking: ${complaint['tracking_code'] ?? ""}",
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: () {
-                setState(() => _selectedMarkerIndex = null);
-              },
-            )
-          ],
-        ),
-
-        const SizedBox(height: 6),
-
-        Text("Type: ${complaint['complaint_type']}"),
-        Text("Category: ${complaint['category']}"),
-
-        const SizedBox(height: 6),
-
-        Text(complaint['description'] ?? ""),
-
-        const SizedBox(height: 10),
-
-     if (complaint['image_url'] != null &&
-    complaint['image_url'].toString().isNotEmpty)
-  Padding(
-    padding: const EdgeInsets.only(top: 10),
-    child: ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: Image.network(
-        complaint['image_url'],
-        height: 150,
-        width: double.infinity,
-        fit: BoxFit.cover,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10),
+        ],
       ),
-    ),
-  ),
-
-        const SizedBox(height: 12),
-
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ComplaintsListScreen(
-                    highlightComplaintId: complaint['complaint_id'],
-                    highlightComplaintType: complaint['complaint_type'],
-                  ),
-                ),
-              );
-            },
-            child: const Text("View / Edit"),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "Tracking: ${complaint['tracking_code'] ?? ""}",
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () {
+                  setState(() => _selectedMarkerIndex = null);
+                },
+              ),
+            ],
           ),
-        )
-      ],
-    ),
-  );
-}
+
+          const SizedBox(height: 6),
+
+          Text("Type: ${complaint['complaint_type']}"),
+          Text("Category: ${complaint['category']}"),
+
+          const SizedBox(height: 6),
+
+          Text(complaint['description'] ?? ""),
+
+          const SizedBox(height: 10),
+
+          if (complaint['image_url'] != null &&
+              complaint['image_url'].toString().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  complaint['image_url'],
+                  height: 150,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+
+          const SizedBox(height: 12),
+
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ComplaintsListScreen(
+                      highlightComplaintId: complaint['complaint_id'],
+                      highlightComplaintType: complaint['complaint_type'],
+                    ),
+                  ),
+                );
+              },
+              child: const Text("View / Edit"),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

@@ -103,29 +103,39 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
     }
 
     try {
-      const double radius = 0.1; // ~10 km bounding box
+      const double radius = 0.1;
 
       final lat = _selectedLocation!.latitude;
       final lng = _selectedLocation!.longitude;
 
       final sections = await supabase
           .from('sections')
-          .select('section_id, latitude, longitude')
+          .select('''
+          section_id,
+          latitude,
+          longitude,
+          officers!inner(
+            officer_id,
+            is_active
+          )
+        ''')
+          .eq('officers.is_active', true)
           .gte('latitude', lat - radius)
           .lte('latitude', lat + radius)
           .gte('longitude', lng - radius)
-          .lte('longitude', lng + radius);
+          .lte('longitude', lng + radius)
+          .eq('is_active', true);
 
       if (sections.isEmpty) {
-        throw Exception("No nearby section found.");
+        throw Exception("No nearby section with active officer found.");
       }
 
       double minDistance = double.infinity;
       String? nearestSectionId;
 
       for (var section in sections) {
-        final sectionLat = double.tryParse(section['latitude'].toString());
-        final sectionLon = double.tryParse(section['longitude'].toString());
+        final sectionLat = section['latitude'];
+        final sectionLon = section['longitude'];
 
         if (sectionLat == null || sectionLon == null) continue;
 
@@ -133,12 +143,12 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
 
         if (distance < minDistance) {
           minDistance = distance;
-          nearestSectionId = section['section_id'].toString();
+          nearestSectionId = section['section_id'];
         }
       }
 
       if (nearestSectionId == null) {
-        throw Exception("Unable to assign nearest section.");
+        throw Exception("Unable to assign section with officer.");
       }
 
       if (mounted) {
@@ -299,7 +309,6 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
         'title': 'New Complaint Registered',
         'message':
             'Complaint ${response['tracking_code']} has been registered.',
-        
       });
 
       _showSuccessDialog(response['tracking_code']);
@@ -690,12 +699,22 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
                                   },
                                 ),
                                 children: [
+                                  // TileLayer(
+                                  //   urlTemplate:
+                                  //       "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png",
+                                  //   subdomains: const ['a', 'b', 'c', 'd'],
+                                  //   userAgentPackageName: "com.complaintapp.flutter_map",
+                                  //   maxZoom: 20,
+                                  // ),
                                   TileLayer(
                                     urlTemplate:
-                                        'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-                                    subdomains: const ['a', 'b', 'c'],
+                                        "https://api.maptiler.com/maps/streets-v4/{z}/{x}/{y}.png?key=6PG81cDlAFK36afvUVNL",
+                                    tileDimension: 512,
+                                    zoomOffset: -1,
+                                    maxZoom: 50,
                                     userAgentPackageName:
-                                        'com.complaintapp.report',
+                                        "com.complaintapp.flutter_map",
+                                    retinaMode: true,
                                   ),
 
                                   // 2. FIXED: Added the Blue Dot Layer here!
