@@ -5,20 +5,36 @@ class AboutUsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    
+    const navyBlue = Color(0xFF0D3B66);
+    const backgroundGrey = Color(0xFFF5F5F5);
+    return Scaffold(
+      backgroundColor: backgroundGrey,
+      appBar: AppBar(
+        backgroundColor: navyBlue,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            size: 20,
+            color: Colors.white,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          "Report Complaint",
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+        ),
+        centerTitle: true,
+      ),
 
-    return Container(
-      child: SingleChildScrollView(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: const [
             Text(
               "About KSEB Connect",
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
 
             SizedBox(height: 15),
@@ -39,10 +55,7 @@ class AboutUsScreen extends StatelessWidget {
 
             Text(
               "Key Features",
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
 
             SizedBox(height: 10),
@@ -60,8 +73,6 @@ class AboutUsScreen extends StatelessWidget {
             ),
 
             SizedBox(height: 30),
-
-            
           ],
         ),
       ),

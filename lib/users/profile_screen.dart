@@ -3,11 +3,10 @@ import 'package:kseb_connect/user_login_screen.dart';
 import '../main.dart'; // supabase client
 import 'package:provider/provider.dart';
 import '../providers/user_data_provider.dart';
+import 'about_us_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
-  final VoidCallback onAboutTap;
-
-  const ProfileScreen({super.key, required this.onAboutTap});
+  const ProfileScreen({super.key});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -133,7 +132,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       // --- Body ---
       body: loading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF0D3B66),))
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFF0D3B66)),
+            )
           : SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -142,7 +143,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   // 1. Profile Header Section
                   Row(
                     children: [
-                      // profile icon 
+                      // profile icon
                       CircleAvatar(
                         radius: 40,
                         backgroundColor: Colors.grey[400],
@@ -226,7 +227,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     _buildListTile(
                       Icons.info_outline,
                       "About us",
-                      onTap: widget.onAboutTap,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AboutUsScreen(),
+                          ),
+                        );
+                      },
                     ),
                     _buildListTile(
                       Icons.question_answer_outlined,
