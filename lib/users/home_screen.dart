@@ -1,321 +1,234 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:kseb_connect/providers/complaint_provider.dart';
+import 'package:kseb_connect/providers/home_provider.dart';
 import 'report_complaint_screen.dart';
 import 'package:provider/provider.dart';
-import '../providers/user_data_provider.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+import 'main_layout.dart';
+import 'package:intl/intl.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<HomeScreen> createState() => HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  final supabase = Supabase.instance.client;
+class HomeScreenState extends State<HomeScreen> {
+  HomeProvider get home => context.watch<HomeProvider>();
 
-  String locationName = "Fetching location...";
-  bool locationLoading = true;
-  List<Map<String, dynamic>> notifications = [];
-  bool notificationsLoading = true;
-  bool loading = true;
-String userName = "User";
+  final ScrollController _scrollController = ScrollController();
+  double maxPullDown = 40;
+  double bottomLimit = 60;
+  bool isHolding = false;
 
-static const Color backgroundWhite = Colors.white;
-static const Color sheetGrey = Color(0xFFF2F2F2);
-static const Color textDark = Colors.black87;
+  static const Color backgroundWhite = Colors.white;
+  static const Color sheetGrey = Color.fromARGB(255, 231, 231, 231);
+  static const Color textDark = Colors.black87;
 
-double headerRevealHeight = 170;
+  // for realtime color change
+
+  Color getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case "pending":
+        return const Color(0xFFE89020); // orange
+      case "in-progress":
+        return const Color(0xFF2E77AE); // blue
+      case "resolved":
+        return const Color(0xFF38D52D); // green
+      default:
+        return Colors.grey;
+    }
+  }
+
+  Color getStatusIconBg(String status) {
+    switch (status.toLowerCase()) {
+      case "pending":
+        return const Color(0xFFFFF3E0);
+      case "in-progress":
+        return const Color(0xFFE3F2FD);
+      case "resolved":
+        return const Color(0xFFE8F5E9);
+      default:
+        return Colors.grey.shade200;
+    }
+  }
+
+  Color getStatusIconColor(String status) {
+    switch (status.toLowerCase()) {
+      case "pending":
+        return const Color(0xFFE89020);
+      case "in-progress":
+        return const Color(0xFF2E77AE);
+      case "resolved":
+        return const Color(0xFF38D52D);
+      default:
+        return Colors.grey;
+    }
+  }
 
   @override
   void initState() {
     super.initState();
 
-    _fetchCurrentLocationName();
-    _fetchSectionNotifications();
-    _fetchUserName();
+    _scrollController.addListener(() {
+      if (!_scrollController.hasClients) return;
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final user = supabase.auth.currentUser;
+      double offset = _scrollController.offset;
 
-      if (user != null) {
-        context.read<UserDataProvider>().loadUserName(user.id);
+      if (offset < -maxPullDown) {
+        _scrollController.jumpTo(-maxPullDown);
       }
 
-      _loadUserConsumers();
+      if (offset > _scrollController.position.maxScrollExtent) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      }
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final provider = context.read<HomeProvider>();
+      await provider.loadHomeData();
+      context.read<ComplaintProvider>().loadComplaints();
     });
   }
 
-  // --- LOGIC FUNCTIONS REMAIN UNTOUCHED ---
-  Future<void> _fetchCurrentLocationName() async {
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        setState(() {
-          locationName = "Location Disabled";
-          locationLoading = false;
-        });
-        return;
-      }
+  // date formatting
 
-      LocationPermission permission = await Geolocator.checkPermission();
+  String formatAnnouncementTime(String? timeString) {
+    if (timeString == null || timeString.isEmpty) return "";
 
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          setState(() {
-            locationName = "Permission Denied";
-            locationLoading = false;
-          });
-          return;
-        }
-      }
+    final DateTime time = DateTime.parse(timeString).toLocal();
+    final DateTime now = DateTime.now();
+    final difference = now.difference(time);
 
-      if (permission == LocationPermission.deniedForever) {
-        setState(() {
-          locationName = "Permission Permanently Denied";
-          locationLoading = false;
-        });
-        return;
-      }
-
-      Position position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 10),
-        ),
-      );
-
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
-
-      if (placemarks.isNotEmpty) {
-        final place = placemarks.first;
-
-        setState(() {
-          locationName =
-              place.locality ??
-              place.subLocality ??
-              place.administrativeArea ??
-              "Unknown Location";
-          locationLoading = false;
-        });
-      } else {
-        setState(() {
-          locationName = "Unknown Location";
-          locationLoading = false;
-        });
-      }
-    } catch (e) {
-      debugPrint("LOCATION ERROR: $e");
-      setState(() {
-        locationName = "Location Error";
-        locationLoading = false;
-      });
-    }
-  }
-
-  Future<void> _loadUserConsumers() async {
-    final user = supabase.auth.currentUser;
-
-    if (user == null) return;
-    final provider = context.read<UserDataProvider>();
-    if (provider.consumerConnections.isEmpty) {
-      await provider.loadConsumers(user.id);
-    }
-  }
-
-  Future<void> _fetchUserName() async {
-    final user = supabase.auth.currentUser;
-
-    if (user == null) {
-      if (mounted) setState(() => loading = false);
-      return;
-    }
-
-    try {
-      final response = await supabase
-          .from('users')
-          .select('name')
-          .eq('id', user.id)
-          .maybeSingle();
-
-      if (response != null) {
-        if (mounted) {
-          setState(() {
-            userName = response['name'] ?? "User";
-            loading = false;
-          });
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            userName = "User";
-            loading = false;
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint('Error fetching user name: $e');
-      if (mounted) {
-        setState(() {
-          userName = "User";
-          loading = false;
-        });
-      }
-
-      ScaffoldMessenger.of(
-        // ignore: use_build_context_synchronously
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error loading profile: $e')));
-    }
-  }
-
-  Future<void> _fetchSectionNotifications() async {
-    try {
-      final user = supabase.auth.currentUser;
-      if (user == null) return;
-
-    // Get all sections connected to the user
-    final connections = await supabase
-        .from('consumer_connections')
-        .select('section_id')
-        .eq('user_id', user.id);
-
-      if (connections.isEmpty) {
-        setState(() {
-          notifications = [];
-          notificationsLoading = false;
-        });
-        return;
-      }
-
-      final sectionIds = connections.map((c) => c['section_id']).toList();
-
-    // Fetch notifications for those sections
-    final response = await supabase
-        .from('notifications')
-        .select()
-        .eq('recipient_type', 'section')
-        .inFilter('section_id', sectionIds)
-        .order('created_at', ascending: false);
-
-      if (mounted) {
-        setState(() {
-          notifications = List<Map<String, dynamic>>.from(response);
-          notificationsLoading = false;
-        });
-      }
-    } catch (e) {
-      debugPrint("Notification fetch error: $e");
+    if (difference.inMinutes < 1) {
+      return "Just now";
+    } else if (difference.inHours < 1) {
+      return "${difference.inMinutes} min ago";
+    } else if (difference.inDays == 0) {
+      return "Today • ${DateFormat('hh:mm a').format(time)}";
+    } else if (difference.inDays == 1) {
+      return "Yesterday • ${DateFormat('hh:mm a').format(time)}";
+    } else {
+      return DateFormat('dd MMM yyyy').format(time);
     }
   }
 
   // --- UI DESIGN ---
   @override
   Widget build(BuildContext context) {
-    const backgroundGrey = Color(0xFFF2F2F2);
+    if (home.loading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFF0D3B66),)));
+    }
     const orangeColor = Color(0xFFE85842); // For Report Button
+    double headerRevealHeight = 200;
+    final complaintProvider = context.watch<ComplaintProvider>();
+
+    final complaints = complaintProvider.nearbyComplaints;
 
     return Scaffold(
-      backgroundColor: backgroundWhite, 
+      backgroundColor: backgroundWhite,
       body: Stack(
         children: [
           // 1. BACKGROUND HEADER (Fixed in place, White Background, Dark Text)
+          // 1. BACKGROUND HEADER WITH IMAGE
           Positioned(
             top: 0,
             left: 0,
             right: 0,
-            child: Padding(
-              // Padding from the top (adjust if MainLayout AppBar overlaps)
-              padding: const EdgeInsets.only(top: 20, left: 15, right: 15),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Left Side: Texts
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            child: Container(
+              height: 265,
+              decoration: const BoxDecoration(
+                image: DecorationImage(
+                  image: AssetImage("assets/power_bg.jpg"),
+                  fit: BoxFit.cover,
+                ),
+              ),
+              child: Container(
+                padding: const EdgeInsets.only(top: 35, left: 18, right: 18),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.black.withValues(alpha: 0.55),
+                      Colors.black.withValues(alpha: 0.25),
+                      Colors.transparent,
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Welcome Text
+                    Text(
+                      "Welcome, ${home.userName}",
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // Location
+                    Row(
                       children: [
-                        loading
-                            ? const CircularProgressIndicator()
-                            : Text(
-                                "Welcome, $userName",
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-
-                        const SizedBox(height: 8),
-
-                        // Location Text
-                        Row(
-                          children: [
-                            const Icon(Icons.location_on, size: 16, color: Colors.grey),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                "Location: ${locationLoading ? "Fetching..." : locationName}",
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.black54,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
+                        const Icon(
+                          Icons.location_on,
+                          size: 16,
+                          color: Colors.white70,
                         ),
-                        const SizedBox(height: 16),
-
-                        // Active Complaints & Updates (Styled simply with dark text)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
+                        const SizedBox(width: 4),
+                        Expanded(
                           child: Text(
-                            "2 Active Complaints",
-                            style: TextStyle(
-                              color: Colors.green.shade800, 
-                              fontSize: 12, 
-                              fontWeight: FontWeight.bold
+                            home.locationName,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.white70,
+                              fontWeight: FontWeight.w500,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          "Last update: Officer assigned",
-                          style: TextStyle(color: Colors.blue.shade700, fontSize: 12, fontWeight: FontWeight.w600),
                         ),
                       ],
                     ),
-                  ),
 
-                  // Right Side: SVG Lineman Image
-                  SizedBox(
-                    width: 120, // Adjust width as needed
-                    height: 120, // Adjust height as needed
-                    child: SvgPicture.asset(
-                      'assets/lineman.svg',
-                      fit: BoxFit.contain,
-                      alignment: Alignment.topRight,
-                      placeholderBuilder: (context) => const Icon(
-                        Icons.engineering,
-                        size: 60,
-                        color: Colors.orange,
+                    const SizedBox(height: 18),
+
+                    // Active Complaints Badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withValues(alpha: 0.85),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        "${complaints.length} Active Complaints",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+
+                    const SizedBox(height: 6),
+
+                    const Text(
+                      "Last update: Officer assigned",
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -323,7 +236,10 @@ double headerRevealHeight = 170;
           // 2. FOREGROUND SCROLLABLE SHEET (Overwrites background when scrolled)
           Positioned.fill(
             child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
+              controller: _scrollController,
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
               child: Column(
                 children: [
                   // This invisible box creates the gap so you can see the white header behind it
@@ -334,7 +250,9 @@ double headerRevealHeight = 170;
                     width: double.infinity,
                     // Ensures the sheet reaches the bottom of the screen
                     constraints: BoxConstraints(
-                      minHeight: MediaQuery.of(context).size.height - headerRevealHeight,
+                      minHeight:
+                          MediaQuery.of(context).size.height -
+                          headerRevealHeight,
                     ),
                     decoration: BoxDecoration(
                       color: sheetGrey,
@@ -344,9 +262,12 @@ double headerRevealHeight = 170;
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
+                          color: Colors.black.withValues(alpha: 0.05),
                           blurRadius: 10,
-                          offset: const Offset(0, -5), // Shadow pointing upwards
+                          offset: const Offset(
+                            0,
+                            -5,
+                          ), // Shadow pointing upwards
                         ),
                       ],
                     ),
@@ -355,14 +276,32 @@ double headerRevealHeight = 170;
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Small handle indicator at the top of the sheet
-                        Center(
-                          child: Container(
-                            width: 40,
-                            height: 4,
-                            margin: const EdgeInsets.only(bottom: 25),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade400,
-                              borderRadius: BorderRadius.circular(10),
+                        GestureDetector(
+                          onTapDown: (_) {
+                            setState(() {
+                              isHolding = true;
+                            });
+                          },
+                          onTapUp: (_) {
+                            setState(() {
+                              isHolding = false;
+                            });
+                          },
+                          onTapCancel: () {
+                            setState(() {
+                              isHolding = false;
+                            });
+                          },
+                          child: Center(
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              width: isHolding ? 70 : 40,
+                              height: 5,
+                              margin: const EdgeInsets.only(bottom: 25),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade400,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                             ),
                           ),
                         ),
@@ -370,14 +309,15 @@ double headerRevealHeight = 170;
                         // --- REPORT BUTTON ---
                         SizedBox(
                           width: double.infinity,
-                          height: 55,
-                          child: ElevatedButton.icon(
+                          height: 60,
+                          child: ElevatedButton(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: orangeColor,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(25), // Pill shaped
+                                borderRadius: BorderRadius.circular(15),
                               ),
-                              elevation: 2,
+                              elevation: 5,
+                              shadowColor: orangeColor.withValues(alpha: 0.4),
                             ),
                             onPressed: () {
                               Navigator.push(
@@ -387,13 +327,31 @@ double headerRevealHeight = 170;
                                 ),
                               );
                             },
-                            label: const Text(
-                              "Report a New Complaint",
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.report_problem,
+                                    color: orangeColor,
+                                    size: 18,
+                                  ),
+                                ),
+                                const SizedBox(width: 15),
+                                const Text(
+                                  "Report a New Complaint",
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -403,80 +361,133 @@ double headerRevealHeight = 170;
                         // --- ALERTS & ANNOUNCEMENTS ---
                         const Row(
                           children: [
-                            Icon(Icons.campaign, color: textDark, size: 22),
+                            Icon(
+                              Icons.campaign,
+                              color: Colors.orange,
+                              size: 24,
+                            ),
                             SizedBox(width: 8),
                             Text(
                               "Alerts & Announcements",
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textDark),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: textDark,
+                              ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 12),
 
-                        notificationsLoading
-                            ? const Center(child: Padding(
-                              padding: EdgeInsets.all(20.0),
-                              child: CircularProgressIndicator(),
-                            ))
-                            : notifications.isEmpty
-                                ? const Text("No announcements", style: TextStyle(color: Colors.grey))
-                                : Column(
-                                    children: notifications.map((notif) {
-                                      return Padding(
-                                        padding: const EdgeInsets.only(bottom: 12),
-                                        child: _buildAlertCard(
-                                          icon: Icons.info_outline,
-                                          iconColor: Colors.blue.shade700,
-                                          title: "Notification",
-                                          text: notif['message'] ?? '',
-                                          date: "Today",
-                                          badgeText: "NEW",
-                                          badgeColor: Colors.orange.shade100,
-                                          badgeTextColor: Colors.orange.shade800,
-                                        ),
-                                      );
-                                    }).toList(),
-                                  ),
+                        home.loading
+                            ? const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(20.0),
+                                  child: CircularProgressIndicator(),
+                                ),
+                              )
+                            : home.notifications.isEmpty
+                            ? const Text(
+                                "No announcements",
+                                style: TextStyle(color: Colors.grey),
+                              )
+                            : Column(
+                                children: home.notifications.map((notif) {
+                                  final bool isAlert =
+                                      notif['is_alert'] == true;
+
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: _buildAlertCard(
+                                      icon: isAlert
+                                          ? Icons.warning_amber_rounded
+                                          : Icons.info_outline,
+
+                                      iconColor: isAlert
+                                          ? Colors.red
+                                          : Colors.blue.shade700,
+
+                                      title: notif['title'] ?? "Notification",
+                                      text: notif['message'] ?? '',
+                                      date: formatAnnouncementTime(
+                                        notif['created_at'],
+                                      ),
+
+                                      badgeText: notif['is_read'] == false
+                                          ? "NEW"
+                                          : "OLD",
+
+                                      badgeColor: Colors.orange.shade100,
+                                      badgeTextColor: Colors.orange.shade800,
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
 
                         const SizedBox(height: 25),
 
                         // --- ISSUES NEAR YOU ---
                         const Row(
                           children: [
-                            Icon(Icons.location_on, color: textDark, size: 22),
+                            Icon(
+                              Icons.location_on,
+                              color: Colors.green,
+                              size: 24,
+                            ),
                             SizedBox(width: 8),
                             Text(
                               "Issues Near You",
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textDark),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: textDark,
+                              ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 12),
 
                         // Static Issue List matching design
-                        Column(
-                          children: [
-                            _buildIssueItem(
-                              title: "Power Outage",
-                              location: "East Hill",
-                              status: "In Progress",
-                              distance: "1.2 km away",
-                              statusColor: Colors.blue.shade700,
-                              iconContainerColor: Colors.orange.shade50,
-                              iconColor: Colors.orange,
-                            ),
-                            _buildIssueItem(
-                              title: "Street Light Failure",
-                              location: "Nadakkavu",
-                              status: "Assigned",
-                              distance: "0.8 km away",
-                              statusColor: Colors.green.shade600,
-                              iconContainerColor: Colors.orange.shade50,
-                              iconColor: Colors.orange,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 40), // Extra bottom padding for scroll
+                        home.loading
+                            ? const Center(child: CircularProgressIndicator())
+                            : complaints.isEmpty
+                            ? const Text(
+                                "No issues reported near you",
+                                style: TextStyle(color: Colors.grey),
+                              )
+                            : Column(
+                                children: complaints.map((complaint) {
+                                  return GestureDetector(
+                                    onTap: () {
+                                      MainLayout.openNearbyComplaint(
+                                        complaint['point'].latitude,
+                                        complaint['point'].longitude,
+                                      );
+                                    },
+                                    child: _buildIssueItem(
+                                      title: complaint['title'] ?? "Complaint",
+                                      location:
+                                          complaint['locationName'] ??
+                                          "Unknown",
+                                      status: complaint['status'] ?? "Pending",
+                                      distance:
+                                          "${(complaint['distance'] ?? 0).toStringAsFixed(1)} km away",
+                                      statusColor: getStatusColor(
+                                        complaint['status'] ?? "pending",
+                                      ),
+                                      iconContainerColor: getStatusIconBg(
+                                        complaint['status'] ?? "pending",
+                                      ),
+                                      iconColor: getStatusIconColor(
+                                        complaint['status'] ?? "pending",
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                        const SizedBox(
+                          height: 40,
+                        ), // Extra bottom padding for scroll
                       ],
                     ),
                   ),
@@ -508,7 +519,7 @@ double headerRevealHeight = 170;
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -539,7 +550,10 @@ double headerRevealHeight = 170;
                         if (badgeText.isNotEmpty) ...[
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: badgeColor,
                               borderRadius: BorderRadius.circular(4),
@@ -558,7 +572,10 @@ double headerRevealHeight = 170;
                     ),
                     Text(
                       date,
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade500,
+                      ),
                     ),
                   ],
                 ),
@@ -596,7 +613,7 @@ double headerRevealHeight = 170;
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -637,7 +654,10 @@ double headerRevealHeight = 170;
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: statusColor,
                   borderRadius: BorderRadius.circular(12),
@@ -665,5 +685,11 @@ double headerRevealHeight = 170;
         ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 }

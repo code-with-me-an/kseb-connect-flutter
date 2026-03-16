@@ -18,7 +18,6 @@ class OtpScreen extends StatefulWidget {
 class _OtpScreenState extends State<OtpScreen> {
   final otpController = TextEditingController();
 
-  // NEW: Variable to track input length for button color change
   String _otpCode = "";
   bool verifying = false;
 
@@ -51,6 +50,23 @@ class _OtpScreenState extends State<OtpScreen> {
     });
   }
 
+  /// NEW FUNCTION
+  /// Link logged user with consumer table using mobile number
+  Future<void> linkConsumer(String phone, String userId) async {
+  try {
+    final result = await supabase
+        .from('consumer_connections')
+        .update({'user_id': userId})
+        .eq('mobile_number', phone)
+        .select();
+
+    debugPrint("Updated consumers: $result");
+  } catch (e) {
+    debugPrint("Consumer linking failed: $e");
+  }
+}
+
+
   Future<void> verifyOtp() async {
     final otp = otpController.text.trim();
 
@@ -77,6 +93,9 @@ class _OtpScreenState extends State<OtpScreen> {
           'mobile_number': widget.phone,
           'last_login_at': DateTime.now().toIso8601String(),
         });
+
+        /// NEW: connect consumer table with user
+        await linkConsumer(widget.phone, user.id);
       } catch (upsertError) {
         debugPrint('Failed to create user profile: $upsertError');
         if (mounted) {
@@ -187,7 +206,9 @@ class _OtpScreenState extends State<OtpScreen> {
                     color: Colors.black,
                   ),
                 ),
+
                 const SizedBox(height: 12),
+
                 RichText(
                   textAlign: TextAlign.center,
                   text: TextSpan(
@@ -217,7 +238,6 @@ class _OtpScreenState extends State<OtpScreen> {
                   defaultPinTheme: defaultPinTheme,
                   focusedPinTheme: focusedPinTheme,
                   keyboardType: TextInputType.number,
-                  // NEW: Update state as user types to change button color
                   onChanged: (value) {
                     setState(() {
                       _otpCode = value;
@@ -241,16 +261,13 @@ class _OtpScreenState extends State<OtpScreen> {
                   width: double.infinity,
                   height: 55,
                   child: ElevatedButton(
-                    // Only enable if logic allows (not verifying AND length is 6)
                     onPressed: (verifying || _otpCode.length < 6)
                         ? null
                         : verifyOtp,
                     style: ElevatedButton.styleFrom(
-                      // NEW: Dynamic Background Color (Blue if 6 digits, Grey otherwise)
                       backgroundColor: _otpCode.length == 6
                           ? primaryColor
                           : const Color(0xFFE0E0E0),
-                      // NEW: Dynamic Text Color (White if 6 digits, Grey otherwise)
                       foregroundColor: _otpCode.length == 6
                           ? Colors.white
                           : const Color(0xFF888888),
@@ -273,7 +290,6 @@ class _OtpScreenState extends State<OtpScreen> {
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              // Color is handled by foregroundColor property above
                             ),
                           ),
                   ),

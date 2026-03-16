@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart'; // 1. Import this
 import 'package:kseb_connect/user_login_screen.dart';
 import '../main.dart'; // supabase client
 import 'package:provider/provider.dart';
 import '../providers/user_data_provider.dart';
+import 'about_us_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
-  final VoidCallback onAboutTap;
-
-  const ProfileScreen({super.key, required this.onAboutTap});
+  const ProfileScreen({super.key});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -134,7 +132,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       // --- Body ---
       body: loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFF0D3B66)),
+            )
           : SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -143,13 +143,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   // 1. Profile Header Section
                   Row(
                     children: [
-                      // --- CHANGED: SVG Profile Icon ---
-                      ClipOval(
-                        child: SvgPicture.asset(
-                          'assets/profile.svg', // Your SVG file path
-                          width: 70, // Equivalent to radius 35 * 2
-                          height: 70,
-                          fit: BoxFit.cover,
+                      // profile icon
+                      CircleAvatar(
+                        radius: 40,
+                        backgroundColor: Colors.grey[400],
+                        child: const Icon(
+                          Icons.person,
+                          size: 55,
+                          color: Colors.white,
                         ),
                       ),
 
@@ -226,7 +227,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     _buildListTile(
                       Icons.info_outline,
                       "About us",
-                      onTap: widget.onAboutTap,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AboutUsScreen(),
+                          ),
+                        );
+                      },
                     ),
                     _buildListTile(
                       Icons.question_answer_outlined,

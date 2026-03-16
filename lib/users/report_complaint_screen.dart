@@ -10,6 +10,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
 import 'package:provider/provider.dart';
 import '../providers/user_data_provider.dart';
+import 'package:geocoding/geocoding.dart';
 
 class ReportComplaintScreen extends StatefulWidget {
   const ReportComplaintScreen({super.key});
@@ -32,6 +33,28 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
   bool _isMapLoading = true;
   bool submitting = false;
   LatLng? _cachedLocation;
+
+  // generate the location name
+
+  Future<String?> getLocationName(double lat, double lng) async {
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(lat, lng);
+
+      if (placemarks.isNotEmpty) {
+        final place = placemarks.first;
+
+        return [
+          place.subLocality,
+          place.locality,
+          place.administrativeArea,
+        ].where((e) => e != null && e.isNotEmpty).join(", ");
+      }
+    } catch (e) {
+      debugPrint("Geocoding error: $e");
+    }
+
+    return null;
+  }
 
   // generate unique tracking code for each complaint
 
@@ -80,29 +103,39 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
     }
 
     try {
-      const double radius = 0.1; // ~10 km bounding box
+      const double radius = 0.1;
 
       final lat = _selectedLocation!.latitude;
       final lng = _selectedLocation!.longitude;
 
       final sections = await supabase
           .from('sections')
-          .select('section_id, latitude, longitude')
+          .select('''
+          section_id,
+          latitude,
+          longitude,
+          officers!inner(
+            officer_id,
+            is_active
+          )
+        ''')
+          .eq('officers.is_active', true)
           .gte('latitude', lat - radius)
           .lte('latitude', lat + radius)
           .gte('longitude', lng - radius)
-          .lte('longitude', lng + radius);
+          .lte('longitude', lng + radius)
+          .eq('is_active', true);
 
       if (sections.isEmpty) {
-        throw Exception("No nearby section found.");
+        throw Exception("No nearby section with active officer found.");
       }
 
       double minDistance = double.infinity;
       String? nearestSectionId;
 
       for (var section in sections) {
-        final sectionLat = double.tryParse(section['latitude'].toString());
-        final sectionLon = double.tryParse(section['longitude'].toString());
+        final sectionLat = section['latitude'];
+        final sectionLon = section['longitude'];
 
         if (sectionLat == null || sectionLon == null) continue;
 
@@ -110,12 +143,12 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
 
         if (distance < minDistance) {
           minDistance = distance;
-          nearestSectionId = section['section_id'].toString();
+          nearestSectionId = section['section_id'];
         }
       }
 
       if (nearestSectionId == null) {
-        throw Exception("Unable to assign nearest section.");
+        throw Exception("Unable to assign section with officer.");
       }
 
       if (mounted) {
@@ -214,6 +247,7 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
     String? consumerId,
     double? latitude,
     double? longitude,
+    String? locationName,
   }) async {
     final user = supabase.auth.currentUser;
     String trackingCode = generateTrackingCode();
@@ -239,6 +273,10 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
       await _findNearestSection();
     }
 
+    if (latitude != null && longitude != null) {
+      locationName = await getLocationName(latitude, longitude);
+    }
+
     if (complaintType == 'personal' && _selectedSectionId == null) {
       throw Exception("Please select consumer connection");
     }
@@ -256,14 +294,26 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
             'consumer_id': complaintType == 'personal' ? consumerId : null,
             'latitude': latitude,
             'longitude': longitude,
+            'location_name': locationName,
             'image_url': imageUrl,
           })
           .select()
           .single();
 
+      // send notification to section officer
+
+      await supabase.from('notifications').insert({
+        'complaint_id': response['complaint_id'],
+        'recipient_type': 'officer',
+        'section_id': _selectedSectionId,
+        'title': 'New Complaint Registered',
+        'message':
+            'Complaint ${response['tracking_code']} has been registered.',
+      });
+
       _showSuccessDialog(response['tracking_code']);
     } on PostgrestException catch (e) {
-      // 🔴 UNIQUE constraint violation
+      // UNIQUE constraint violation
       if (e.code == '23505') {
         // Generate new code and retry once
         trackingCode = generateTrackingCode();
@@ -280,10 +330,22 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
               'consumer_id': complaintType == 'personal' ? consumerId : null,
               'latitude': latitude,
               'longitude': longitude,
+              'location_name': locationName,
               'image_url': imageUrl,
             })
             .select()
             .single();
+
+        // send notification to section officer
+
+        await supabase.from('notifications').insert({
+          'complaint_id': response['complaint_id'],
+          'recipient_type': 'officer',
+          'section_id': _selectedSectionId,
+          'title': 'New Complaint Registered',
+          'message':
+              'Complaint ${response['tracking_code']} has been registered.',
+        });
 
         _showSuccessDialog(response['tracking_code']);
       } else {
@@ -437,18 +499,19 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
                 if (mounted) {
                   setState(() {
                     category = v;
-
-                    // CHANGED: Reset section only for Personal
-                    if (v == "Personal") {
-                      _selectedSectionId = null;
-                    }
                     _selectedConsumerId = null;
+                    _selectedSectionId = null;
                   });
                 }
 
-                // CHANGED: Fetch connections for Personal, section for Community
+                final user = Supabase.instance.client.auth.currentUser;
+
                 if (v == "Personal") {
-                  
+                  if (user != null) {
+                    await context.read<UserDataProvider>().loadConsumers(
+                      user.id,
+                    );
+                  }
                 } else if (v == "Community") {
                   await _centerToCurrentLocation();
                 }
@@ -490,34 +553,33 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
             // 🔥 IMPROVEMENT 5: Show Consumer Dropdown ONLY if Personal
             // ======================
             if (category == "Personal") ...[
-  if (isLoadingConsumers)
-    const Center(child: CircularProgressIndicator())
-  else if (consumers.isEmpty)
-    const Text("No consumer connections found.")
-  else
-    _buildCustomDropdown(
-      hint: "Select Consumer Number",
-      value: _selectedConsumerId,
-      items: consumers.map<Map<String, String>>((e) {
-        return {
-          "value": e['consumer_id'].toString(),
-          "label": e['consumer_number'].toString(),
-        };
-      }).toList(),
-      onChanged: (val) {
-        final selected = consumers.firstWhere(
-          (e) => e['consumer_id'].toString() == val,
-        );
+              if (isLoadingConsumers)
+                const Center(child: CircularProgressIndicator())
+              else if (consumers.isEmpty)
+                const Text("No consumer connections found.")
+              else
+                _buildCustomDropdown(
+                  hint: "Select Consumer Number",
+                  value: _selectedConsumerId,
+                  items: consumers.map<Map<String, String>>((e) {
+                    return {
+                      "value": e['consumer_id'].toString(),
+                      "label": e['consumer_number'].toString(),
+                    };
+                  }).toList(),
+                  onChanged: (val) {
+                    final selected = consumers.firstWhere(
+                      (e) => e['consumer_id'].toString() == val,
+                    );
 
-        setState(() {
-          _selectedConsumerId = selected['consumer_id'].toString();
-          _selectedSectionId = selected['section_id'].toString();
-        });
-      },
-    ),
-],
+                    setState(() {
+                      _selectedConsumerId = selected['consumer_id'].toString();
+                      _selectedSectionId = selected['section_id'].toString();
+                    });
+                  },
+                ),
+            ],
 
-              
             const SizedBox(height: 15),
             Container(
               decoration: BoxDecoration(
@@ -618,7 +680,11 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
                     child: Stack(
                       children: [
                         _isMapLoading
-                            ? const Center(child: CircularProgressIndicator())
+                            ? const Center(
+                                child: CircularProgressIndicator(
+                                  color: Color(0xFF0D3B66),
+                                ),
+                              )
                             : FlutterMap(
                                 mapController: _mapController,
                                 options: MapOptions(
@@ -633,12 +699,22 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
                                   },
                                 ),
                                 children: [
+                                  // TileLayer(
+                                  //   urlTemplate:
+                                  //       "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png",
+                                  //   subdomains: const ['a', 'b', 'c', 'd'],
+                                  //   userAgentPackageName: "com.complaintapp.flutter_map",
+                                  //   maxZoom: 20,
+                                  // ),
                                   TileLayer(
                                     urlTemplate:
-                                        'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-                                    subdomains: const ['a', 'b', 'c'],
+                                        "https://api.maptiler.com/maps/streets-v4/{z}/{x}/{y}.png?key=6PG81cDlAFK36afvUVNL",
+                                    tileDimension: 512,
+                                    zoomOffset: -1,
+                                    maxZoom: 50,
                                     userAgentPackageName:
-                                        'com.complaintapp.report',
+                                        "com.complaintapp.flutter_map",
+                                    retinaMode: true,
                                   ),
 
                                   // 2. FIXED: Added the Blue Dot Layer here!

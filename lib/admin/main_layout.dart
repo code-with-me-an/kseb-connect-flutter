@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:kseb_connect/admin/admin_notification_screen.dart';
 import 'package:kseb_connect/admin/admin_profile_screen.dart';
 import 'package:kseb_connect/admin/complaints_list_screen.dart';
 import 'admin_dashboard.dart';
 import 'package:kseb_connect/admin/admin_section_map_screen.dart';
-import 'create_section_notification_screen.dart';
 
 class AdminLayout extends StatefulWidget {
   const AdminLayout({super.key});
@@ -56,7 +56,7 @@ class _AdminLayoutState extends State<AdminLayout> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const CreateSectionNotificationScreen(),
+                  builder: (_) => const AdminNotificationScreen(),
                 ),
               );
             },

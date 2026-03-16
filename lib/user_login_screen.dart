@@ -1,4 +1,4 @@
-import 'package:flutter/gestures.dart'; 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:kseb_connect/admin_login_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -34,7 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => loading = true);
 
     // CHANGED: We add +91 here automatically
-    final fullPhoneNumber = "+91$rawPhone"; 
+    final fullPhoneNumber = "+91$rawPhone";
 
     try {
       await supabase.auth.signInWithOtp(phone: fullPhoneNumber);
@@ -49,8 +49,9 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text("OTP Error: $e")));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("OTP Error: $e")));
       }
     } finally {
       if (mounted) {
@@ -69,15 +70,16 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     const textColor = Color(0xFF333333);
-    const primaryColor = Color(0xFF1B4B66); 
-    const linkColor = Color(0xFF63B931); 
+    const primaryColor = Color(0xFF1B4B66);
+    const linkColor = Color(0xFF63B931);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFEEEEEE), 
+      backgroundColor: const Color(0xFFEEEEEE),
       body: SafeArea(
         child: SingleChildScrollView(
           child: Container(
-            height: MediaQuery.of(context).size.height -
+            height:
+                MediaQuery.of(context).size.height -
                 MediaQuery.of(context).padding.top,
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             child: Column(
@@ -171,11 +173,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   maxLength: 10, // Limits input to 10 characters
                   decoration: InputDecoration(
                     // CHANGED: This puts "+91 " visually inside the box
-                    prefixText: "+91 ", 
+                    prefixText: "+91 ",
                     prefixStyle: const TextStyle(
-                      color: Colors.black, 
+                      color: Colors.black,
                       fontWeight: FontWeight.bold,
-                      fontSize: 16
+                      fontSize: 16,
                     ),
                     hintText: "9876543210",
                     counterText: "", // Hides the generic "0/10" counter below
@@ -268,13 +270,13 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           recognizer: TapGestureRecognizer()
                             ..onTap = () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const AdminLoginScreen(),
-      ),
-    );
-  },
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const AdminLoginScreen(),
+                                ),
+                              );
+                            },
                         ),
                       ],
                     ),

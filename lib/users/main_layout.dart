@@ -3,235 +3,177 @@ import 'home_screen.dart';
 import 'my_complaints_screen.dart';
 import 'nearby_complaints_screen.dart';
 import 'profile_screen.dart';
-import 'about_us_screen.dart';
+import '../main.dart';
+import '../services/local_notification_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
+
+  static void openNearbyComplaint(double lat, double lng) {
+    _MainLayoutState.instance?.openNearbyComplaint(lat, lng);
+  }
 
   @override
   State<MainLayout> createState() => _MainLayoutState();
 }
 
 class _MainLayoutState extends State<MainLayout> {
+  static _MainLayoutState? instance;
+  bool _realtimeStarted = false;
+
   int _currentIndex = 0;
-  bool showAbout = false;
   final GlobalKey<NearByComplaintsScreenState> mapKey =
       GlobalKey<NearByComplaintsScreenState>();
 
-  final List<String> _titles = const [
-    "Hello, User",
+  final List<String> _titles = [
+    "KSEB Connect",
     "My Complaints",
     "Nearby Complaints",
     "My Profile",
   ];
 
-  // --- NEW: Function to show the Notification Box ---
-  void _showNotifications(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20.0),
-          ), // Rounded corners
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min, // Wrap content height
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      "Notifications",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () => Navigator.of(context).pop(),
-                      child: const Icon(Icons.close, color: Colors.grey),
-                    ),
-                  ],
-                ),
-                const Divider(height: 30),
-
-                // Notification Items
-                _buildNotificationItem(
-                  icon: Icons.check_circle,
-                  color: Colors.green,
-                  title: "Complaint Resolved",
-                  subtitle: "Your voltage issue (CMP12343) has been fixed.",
-                  time: "2 hrs ago",
-                ),
-                const SizedBox(height: 15),
-                _buildNotificationItem(
-                  icon: Icons.info,
-                  color: Colors.blue,
-                  title: "Officer Assigned",
-                  subtitle: "Officer Rajesh is reviewing your complaint.",
-                  time: "5 hrs ago",
-                ),
-                const SizedBox(height: 15),
-                _buildNotificationItem(
-                  icon: Icons.warning_amber_rounded,
-                  color: Colors.orange,
-                  title: "Maintenance Alert",
-                  subtitle: "Scheduled power cut tomorrow at 10 AM.",
-                  time: "1 day ago",
-                ),
-
-                const SizedBox(height: 10),
-
-                // 'View All' Link
-                Center(
-                  child: TextButton(
-                    onPressed: () {},
-                    child: const Text("View All Notifications"),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+  @override
+  void initState() {
+    super.initState();
+    instance = this;
+    _startRealtimeNotifications();
   }
 
-  // --- Helper Widget for Notification Row ---
-  Widget _buildNotificationItem({
-    required IconData icon,
-    required Color color,
-    required String title,
-    required String subtitle,
-    required String time,
-  }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
-            shape: BoxShape.circle,
+  void _startRealtimeNotifications() {
+    if (_realtimeStarted) return;
+    _realtimeStarted = true;
+
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    supabase
+        .channel('realtime:user_notifications')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'notifications',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: user.id,
           ),
-          child: Icon(icon, color: color, size: 20),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: TextStyle(fontSize: 12, color: Colors.grey[700]),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                time,
-                style: const TextStyle(fontSize: 10, color: Colors.grey),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
+          callback: (payload) {
+            final data = payload.newRecord;
+
+            if (data['recipient_type'] != 'user') return;
+
+            LocalNotificationService.showNotification(
+              title: data['title'] ?? "Notification",
+              body: data['message'] ?? "",
+              payload: data['notification_id']?.toString(),
+            );
+          },
+        )
+        .subscribe();
+  }
+
+  void openNearbyComplaint(double lat, double lng) {
+    setState(() {
+      _currentIndex = 2;
+    });
+
+    mapKey.currentState?.focusComplaint(lat, lng);
   }
 
   @override
   Widget build(BuildContext context) {
     const navyBlue = Color(0xFF0D3B66);
 
-    return Scaffold(
-      // TOP BAR (single source of truth)
-      appBar: AppBar(
-        backgroundColor: navyBlue,
-        elevation: 0,
-        centerTitle: true,
-        title: Text(
-          showAbout ? "About Us" : _titles[_currentIndex],
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-            color: Colors.white,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_none, color: Colors.white),
-            //  Trigger the notification dialog here
-            onPressed: () => _showNotifications(context),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
 
-      // ✅ BODY SWITCHES HERE
-      body: showAbout
-    ? const AboutUsScreen()
-    : IndexedStack(
-        index: _currentIndex,
-        children: [
-          const HomeScreen(),
-          const MyComplaintsScreen(),
-          NearByComplaintsScreen(key: mapKey),
-          ProfileScreen(
-            onAboutTap: () {
-              setState(() {
-                showAbout = true;
-              });
-            },
-          ),
-        ],
-      ),
+        final navigator = Navigator.of(context);
 
-      // ✅ BOTTOM BAR (single)
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: const Color.fromARGB(255, 255, 248, 248),
-        currentIndex: _currentIndex,
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: navyBlue,
-        unselectedItemColor: Colors.grey,
-        onTap: (index) {
+        /// 1. If any route is open → pop it
+        if (navigator.canPop()) {
+          navigator.pop();
+          return;
+        }
+
+        /// 2. If not on Home tab → go to Home
+        if (_currentIndex != 0) {
           setState(() {
-            _currentIndex = index;
-            showAbout = false;
+            _currentIndex = 0;
           });
-          if (index == 2) {
-            mapKey.currentState?.fetchNearbyComplaints();
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.chat_bubble_outline),
-            label: "Complaints",
+          return;
+        }
+
+        /// 3. Already on Home → exit app
+        navigator.pop(); // closes app
+      },
+
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: navyBlue,
+          elevation: 0,
+          centerTitle: true,
+          title: Text(
+            _titles[_currentIndex],
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+              color: Colors.white,
+            ),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.location_on_outlined),
-            label: "Map",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            label: "Profile",
-          ),
-        ],
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.notifications_none, color: Colors.white),
+              onPressed: () async {
+                Navigator.pushNamed(context, '/notification');
+              },
+            ),
+            const SizedBox(width: 8),
+          ],
+        ),
+        body: IndexedStack(
+          index: _currentIndex,
+          children: [
+            const HomeScreen(),
+            const MyComplaintsScreen(),
+            NearByComplaintsScreen(key: mapKey),
+            const ProfileScreen(),
+          ],
+        ),
+
+        bottomNavigationBar: BottomNavigationBar(
+          backgroundColor: const Color.fromARGB(255, 255, 248, 248),
+          currentIndex: _currentIndex,
+          type: BottomNavigationBarType.fixed,
+          selectedItemColor: navyBlue,
+          unselectedItemColor: Colors.grey,
+          onTap: (index) {
+            setState(() {
+              _currentIndex = index;
+            });
+
+            if (index == 2) {
+              mapKey.currentState?.refreshMap();
+            }
+          },
+          items: const [
+            BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.chat_bubble_outline),
+              label: "Complaints",
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.location_on_outlined),
+              label: "Map",
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              label: "Profile",
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -45,6 +45,10 @@ dependencies:
   shared_preferences: ^2.5.4
   provider: ^6.1.5+1
   geocoding: ^4.0.0
+  flutter_local_notifications: ^21.0.0
+  permission_handler: ^12.0.1
+  intl: ^0.20.2
+  flutter_map_marker_cluster: ^8.2.2
 
 dev_dependencies:
   flutter_test:
@@ -73,12 +77,10 @@ flutter:
   assets:
     - assets/logo.png
     - assets/marker.svg
-    - assets/profile.svg
+    - assets/app_icon.png
     - assets/communityicon.svg
     - assets/personalicon.svg
-    - assets/app_icon.png
-    - assets/lineman.svg
-
+    - assets/power_bg.jpg
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
