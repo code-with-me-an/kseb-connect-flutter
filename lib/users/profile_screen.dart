@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:kseb_connect/user_login_screen.dart';
 import '../main.dart'; // supabase client
-import 'about_us_screen.dart';
-import 'profile_details_screen.dart';
-import 'faq_screen.dart';
-import 'notification_settings_screen.dart';
-import 'feedback_screen.dart';
+import 'profile/about_us_screen.dart';
+import 'profile/profile_details_screen.dart';
+import 'profile/faq_screen.dart';
+import 'profile/notification_settings_screen.dart';
+import 'profile/feedback_screen.dart';
 import 'main_layout.dart';
 
 class ProfileScreen extends StatefulWidget {
