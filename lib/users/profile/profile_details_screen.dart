@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../main.dart';
 
 class ProfileDetailsScreen extends StatefulWidget {
@@ -25,7 +26,10 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
 
   Future<void> fetchProfileDetails() async {
     try {
-      final userId = supabase.auth.currentUser!.id;
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id');
+
+      if (userId == null) return;
 
       final data = await supabase
           .from('users')
@@ -74,8 +78,18 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
 
   String _monthName(int month) {
     const months = [
-      "Jan","Feb","Mar","Apr","May","Jun",
-      "Jul","Aug","Sep","Oct","Nov","Dec"
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
     ];
     return months[month - 1];
   }
@@ -111,11 +125,12 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
               padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
-
                   // Profile Header Card
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        vertical: 25, horizontal: 20),
+                      vertical: 25,
+                      horizontal: 20,
+                    ),
 
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -124,7 +139,6 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
 
                     child: Column(
                       children: [
-
                         const CircleAvatar(
                           radius: 45,
                           backgroundColor: Color(0xFFE0E0E0),
@@ -163,11 +177,17 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
                   // Profile Details
                   _buildProfileTile(Icons.phone, "Mobile Number", phoneNumber),
 
-                  _buildProfileTile(Icons.confirmation_number,
-                      "Consumer Number", consumerNumber),
+                  _buildProfileTile(
+                    Icons.confirmation_number,
+                    "Consumer Number",
+                    consumerNumber,
+                  ),
 
                   _buildProfileTile(
-                      Icons.location_city, "Section", sectionName),
+                    Icons.location_city,
+                    "Section",
+                    sectionName,
+                  ),
                 ],
               ),
             ),
@@ -186,11 +206,7 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
 
       child: Row(
         children: [
-
-          Icon(
-            icon,
-            color: const Color(0xFF0D3B66),
-          ),
+          Icon(icon, color: const Color(0xFF0D3B66)),
 
           const SizedBox(width: 15),
 
@@ -198,13 +214,9 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-
                 Text(
                   title,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey,
-                  ),
+                  style: const TextStyle(fontSize: 13, color: Colors.grey),
                 ),
 
                 const SizedBox(height: 3),

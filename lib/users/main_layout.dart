@@ -6,6 +6,7 @@ import 'profile_screen.dart';
 import '../main.dart';
 import '../services/local_notification_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -41,15 +42,17 @@ class _MainLayoutState extends State<MainLayout> {
   void initState() {
     super.initState();
     instance = this;
-    _startRealtimeNotifications();
+    Future.microtask(() => _startRealtimeNotifications());
   }
 
-  void _startRealtimeNotifications() {
+  Future<void> _startRealtimeNotifications() async {
     if (_realtimeStarted) return;
     _realtimeStarted = true;
 
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
+    final prefs = await SharedPreferences.getInstance();
+final userId = prefs.getString('user_id');
+
+if (userId == null) return;
 
     supabase
         .channel('realtime:user_notifications')
@@ -60,7 +63,7 @@ class _MainLayoutState extends State<MainLayout> {
           filter: PostgresChangeFilter(
             type: PostgresChangeFilterType.eq,
             column: 'user_id',
-            value: user.id,
+            value: userId,
           ),
           callback: (payload) {
             final data = payload.newRecord;

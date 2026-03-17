@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class NotificationDetailScreen extends StatefulWidget {
   const NotificationDetailScreen({super.key});
@@ -25,8 +26,10 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
   // notification fetching
 
   Future<void> fetchNotifications() async {
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('user_id');
+
+    if (userId == null) return;
 
     setState(() {
       loading = true;
@@ -42,7 +45,7 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
         )
       ''')
           .eq('recipient_type', 'user')
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .order('created_at', ascending: false);
 
       notifications = List<Map<String, dynamic>>.from(response);
@@ -157,15 +160,17 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
   }
 
   Future<void> deleteAllNotifications() async {
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
+    final prefs = await SharedPreferences.getInstance();
+final userId = prefs.getString('user_id');
+
+if (userId == null) return;
 
     setState(() {
       loading = true;
     });
 
     try {
-      await supabase.from('notifications').delete().eq('user_id', user.id);
+      await supabase.from('notifications').delete().eq('user_id', userId);
 
       setState(() {
         notifications.clear();

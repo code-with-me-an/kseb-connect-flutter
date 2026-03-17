@@ -2,8 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:kseb_connect/users/main_layout.dart';
 import 'package:pinput/pinput.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'main.dart';
+import 'services/local_notification_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class OtpScreen extends StatefulWidget {
   final String name;
@@ -22,7 +23,7 @@ class _OtpScreenState extends State<OtpScreen> {
   bool verifying = false;
 
   Timer? _timer;
-  int _start = 30;
+  int _start = 120;
   bool _canResend = false;
 
   @override
@@ -33,7 +34,7 @@ class _OtpScreenState extends State<OtpScreen> {
 
   void startTimer() {
     setState(() {
-      _start = 30;
+      _start = 120;
       _canResend = false;
     });
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -53,60 +54,83 @@ class _OtpScreenState extends State<OtpScreen> {
   /// NEW FUNCTION
   /// Link logged user with consumer table using mobile number
   Future<void> linkConsumer(String phone, String userId) async {
-  try {
-    final result = await supabase
-        .from('consumer_connections')
-        .update({'user_id': userId})
-        .eq('mobile_number', phone)
-        .select();
+    try {
+      final result = await supabase
+          .from('consumer_connections')
+          .update({'user_id': userId})
+          .eq('mobile_number', phone)
+          .select();
 
-    debugPrint("Updated consumers: $result");
-  } catch (e) {
-    debugPrint("Consumer linking failed: $e");
+      debugPrint("Updated consumers: $result");
+    } catch (e) {
+      debugPrint("Consumer linking failed: $e");
+    }
   }
-}
-
 
   Future<void> verifyOtp() async {
     final otp = otpController.text.trim();
-
     if (otp.length != 6) return;
 
     setState(() => verifying = true);
 
     try {
-      debugPrint("VERIFY OTP → ${widget.phone} : $otp");
+      // 1. VERIFY OTP (same as your code)
+      final result = await supabase
+          .from('phone_otps')
+          .select()
+          .eq('phone', widget.phone)
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
 
-      final response = await supabase.auth.verifyOTP(
-        phone: widget.phone,
-        token: otp,
-        type: OtpType.sms,
-      );
-
-      final user = response.user;
-      if (user == null) throw 'User is null';
-
-      try {
-        await supabase.from('users').upsert({
-          'id': user.id,
-          'name': widget.name,
-          'mobile_number': widget.phone,
-          'last_login_at': DateTime.now().toIso8601String(),
-        });
-
-        /// NEW: connect consumer table with user
-        await linkConsumer(widget.phone, user.id);
-      } catch (upsertError) {
-        debugPrint('Failed to create user profile: $upsertError');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error creating profile: $upsertError')),
-          );
-        }
-        if (mounted) setState(() => verifying = false);
-        return;
+      if (result == null || result['otp'] != otp) {
+        throw "Invalid OTP";
       }
 
+      // 2. CHECK EXISTING USER
+      final existingUser = await supabase
+          .from('users')
+          .select()
+          .eq('mobile_number', widget.phone)
+          .maybeSingle();
+
+      String userId;
+
+      if (existingUser != null) {
+        // ✅ EXISTING USER → reuse SAME ID
+        userId = existingUser['id'];
+
+        // 🔥 IMPORTANT: ensure auth session exists
+        if (supabase.auth.currentUser == null) {
+          await supabase.auth.signInAnonymously();
+        }
+      } else {
+        // 🆕 NEW USER → create auth user
+        final auth = await supabase.auth.signInAnonymously();
+        userId = auth.user!.id;
+      }
+
+      // 3. UPSERT USER (update or insert)
+      await supabase.from('users').upsert({
+        'id': userId,
+        'name': widget.name, // update name
+        'mobile_number': widget.phone,
+        'last_login_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'mobile_number');
+
+      // user id and phone stored 
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_id', userId);
+      await prefs.setString('phone', widget.phone); // optional but useful
+
+      // 4. LINK CONSUMER
+      await linkConsumer(widget.phone, userId);
+
+      // 5. DELETE OTP
+      await supabase.from('phone_otps').delete().eq('phone', widget.phone);
+
+      // 6. NAVIGATE
       if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,
@@ -115,11 +139,9 @@ class _OtpScreenState extends State<OtpScreen> {
         );
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.toString())));
-      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
       if (mounted) setState(() => verifying = false);
     }
@@ -299,12 +321,36 @@ class _OtpScreenState extends State<OtpScreen> {
 
                 if (_canResend)
                   TextButton(
-                    onPressed: () {
+                    onPressed: () async {
                       startTimer();
-                      supabase.auth.signInWithOtp(phone: widget.phone);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("OTP Resent!")),
-                      );
+
+                      final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+                      try {
+                        final response = await supabase.functions.invoke(
+                          'generate-otp',
+                          body: {'phone': widget.phone},
+                        );
+
+                        final otp = response.data['otp'];
+
+                        await LocalNotificationService.showNotification(
+                          title: "KSEB Connect",
+                          body: "Your OTP is $otp (valid 2 min)",
+                        );
+
+                        if (!mounted) return;
+
+                        scaffoldMessenger.showSnackBar(
+                          const SnackBar(content: Text("OTP Resent!")),
+                        );
+                      } catch (e) {
+                        if (!mounted) return;
+
+                        scaffoldMessenger.showSnackBar(
+                          SnackBar(content: Text("Error: $e")),
+                        );
+                      }
                     },
                     child: const Text(
                       "Resend code",

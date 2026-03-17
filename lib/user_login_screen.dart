@@ -4,6 +4,7 @@ import 'package:kseb_connect/admin_login_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'main.dart';
 import 'otp_screen.dart';
+import 'services/local_notification_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -37,7 +38,18 @@ class _LoginScreenState extends State<LoginScreen> {
     final fullPhoneNumber = "+91$rawPhone";
 
     try {
-      await supabase.auth.signInWithOtp(phone: fullPhoneNumber);
+      final response = await supabase.functions.invoke(
+        'generate-otp',
+        body: {'phone': fullPhoneNumber},
+      );
+
+      final otp = response.data['otp'];
+
+      // SHOW FAKE OTP NOTIFICATION
+      await LocalNotificationService.showNotification(
+        title: "KSEB Connect",
+        body: "Your OTP is $otp (valid 2 min)",
+      );
 
       if (mounted) {
         Navigator.push(

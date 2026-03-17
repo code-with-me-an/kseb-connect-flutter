@@ -32,7 +32,6 @@ Future<void> main() async {
   );
 
   /// Start realtime system
-  RealtimeService.start();
 
   /// Initialize local notifications
   await LocalNotificationService.initialize((payload) async {

@@ -11,6 +11,7 @@ import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
 import 'package:provider/provider.dart';
 import '../providers/user_data_provider.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ReportComplaintScreen extends StatefulWidget {
   const ReportComplaintScreen({super.key});
@@ -249,10 +250,11 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
     double? longitude,
     String? locationName,
   }) async {
-    final user = supabase.auth.currentUser;
-    String trackingCode = generateTrackingCode();
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('user_id');
 
-    if (user == null) throw Exception("User not logged in");
+    if (userId == null) throw Exception("User not logged in");
+    String trackingCode = generateTrackingCode();
 
     final complaintType = complaintTypeUI.toLowerCase();
     String? imageUrl;
@@ -286,7 +288,7 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
           .from('complaints')
           .insert({
             'tracking_code': trackingCode,
-            'user_id': user.id,
+            'user_id': userId,
             'section_id': _selectedSectionId,
             'complaint_type': complaintType,
             'category': category,
@@ -322,7 +324,7 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
             .from('complaints')
             .insert({
               'tracking_code': trackingCode,
-              'user_id': user.id,
+              'user_id': userId,
               'section_id': _selectedSectionId,
               'complaint_type': complaintType,
               'category': category,
@@ -504,12 +506,13 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
                   });
                 }
 
-                final user = Supabase.instance.client.auth.currentUser;
+                final prefs = await SharedPreferences.getInstance();
+                final userId = prefs.getString('user_id');
 
                 if (v == "Personal") {
-                  if (user != null) {
+                  if (userId != null) {
                     await context.read<UserDataProvider>().loadConsumers(
-                      user.id,
+                      userId,
                     );
                   }
                 } else if (v == "Community") {
@@ -519,7 +522,7 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
             ),
 
             const SizedBox(height: 15),
-            // 🔥 IMPROVEMENT 4: Proper dropdown map structure (prevents assertion error)
+            //Proper dropdown map structure (prevents assertion error)
             _buildCustomDropdown(
               hint: "Select Complaint Type",
               value: complaintType,

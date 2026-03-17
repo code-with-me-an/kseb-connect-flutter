@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MyComplaintsScreen extends StatefulWidget {
   const MyComplaintsScreen({super.key});
@@ -20,12 +21,14 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
   void initState() {
     super.initState();
     fetchComplaints();
-    startRealtime();
+    Future.microtask(() => startRealtime());
   }
 
-  void startRealtime() {
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
+  Future<void> startRealtime() async {
+    final prefs = await SharedPreferences.getInstance();
+  final userId = prefs.getString('user_id');
+
+  if (userId == null) return;
 
     _channel = supabase
         .channel('realtime:user_complaints')
@@ -36,7 +39,7 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
           filter: PostgresChangeFilter(
             type: PostgresChangeFilterType.eq,
             column: 'user_id',
-            value: user.id,
+            value: userId,
           ),
           callback: (payload) async {
             final event = payload.eventType;
@@ -268,17 +271,19 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
   Future<void> fetchComplaints() async {
     if (mounted) setState(() => loading = true);
 
-    final user = supabase.auth.currentUser;
-    if (user == null) {
-      if (mounted) setState(() => loading = false);
-      return;
-    }
+    final prefs = await SharedPreferences.getInstance();
+final userId = prefs.getString('user_id');
+
+if (userId == null) {
+  if (mounted) setState(() => loading = false);
+  return;
+}
 
     try {
       final response = await supabase
           .from('complaints')
           .select()
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .order('created_at', ascending: false);
 
       if (mounted) {

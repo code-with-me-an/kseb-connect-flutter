@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 import '../providers/complaint_provider.dart';
 import '../providers/section_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class NearByComplaintsScreen extends StatefulWidget {
   final double? highlightLat;
@@ -34,6 +35,10 @@ class NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
   @override
   void initState() {
     super.initState();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<SectionProvider>().loadSections();
+    });
   }
 
   void refreshMap() {
@@ -129,13 +134,14 @@ class NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
 
   Future<void> _upvoteComplaint(String complaintId) async {
     final supabase = Supabase.instance.client;
-    final user = supabase.auth.currentUser;
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('user_id');
 
-    if (user == null) return;
+    if (userId == null) return;
 
     try {
       await supabase.from('upvotes').insert({
-        'user_id': user.id,
+        'user_id': userId,
         'complaint_id': complaintId,
       });
       if (!mounted) return;
@@ -143,9 +149,7 @@ class NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
         context,
       ).showSnackBar(const SnackBar(content: Text("Upvoted successfully")));
 
-      context
-          .read<ComplaintProvider>()
-          .updateNearbyComplaints(); // Refresh list
+      await context.read<ComplaintProvider>().loadComplaints(); // Refresh list
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -166,7 +170,7 @@ class NearByComplaintsScreenState extends State<NearByComplaintsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final complaints = context.watch<ComplaintProvider>().nearbyComplaints;
+    final complaints = context.watch<ComplaintProvider>().nearby;
     final sections = context.watch<SectionProvider>().sections;
 
     double zoom = _mapReady ? _mapController.camera.zoom : 10.0;

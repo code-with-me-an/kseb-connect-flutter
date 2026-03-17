@@ -5,6 +5,7 @@ import 'package:geocoding/geocoding.dart';
 import '../services/location_service.dart';
 import '../services/realtime_service.dart';
 import '../services/local_notification_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class HomeProvider extends ChangeNotifier {
   final supabase = Supabase.instance.client;
@@ -28,17 +29,19 @@ class HomeProvider extends ChangeNotifier {
     loading = true;
     notifyListeners();
 
-    final user = supabase.auth.currentUser;
-    if (user == null) {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('user_id');
+
+    if (userId == null) {
       loading = false;
       return;
     }
 
     try {
       final results = await Future.wait([
-        _fetchUserName(user.id),
+        _fetchUserName(userId),
         _fetchLocation(),
-        _fetchNotifications(user.id),
+        _fetchNotifications(userId),
       ]);
 
       userName = results[0] as String;
@@ -65,9 +68,8 @@ class HomeProvider extends ChangeNotifier {
     _realtimeConnected = true;
 
     RealtimeService.onNotification = (notification) {
-
       // only section announcement reach the user
-      
+
       if (notification['recipient_type'] != 'section') return;
 
       final sectionId = notification['section_id']?.toString();

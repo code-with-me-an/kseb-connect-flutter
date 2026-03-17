@@ -9,6 +9,7 @@ import '../services/realtime_service.dart';
 class ComplaintProvider extends ChangeNotifier {
   final supabase = Supabase.instance.client;
 
+  List<Map<String, dynamic>> get nearby => nearbyComplaints;
   List<Map<String, dynamic>> complaints = [];
   List<Map<String, dynamic>> nearbyComplaints = [];
 

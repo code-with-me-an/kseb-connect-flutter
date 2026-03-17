@@ -7,6 +7,7 @@ import 'profile/faq_screen.dart';
 import 'profile/notification_settings_screen.dart';
 import 'profile/feedback_screen.dart';
 import 'main_layout.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -31,7 +32,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> fetchUserProfile() async {
     try {
-      final userId = supabase.auth.currentUser!.id;
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id');
+
+      if (userId == null) return;
 
       final data = await supabase
           .from('users')
@@ -56,32 +60,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> deleteAccount() async {
-    final userId = supabase.auth.currentUser!.id;
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('user_id');
+
+    if (userId == null) return;
 
     try {
-      // Delete consumer connections
+      // 1. unlink consumer
       await supabase
           .from('consumer_connections')
-          .delete()
+          .update({'user_id': null})
           .eq('user_id', userId);
 
-      // Delete complaints created by user
+      // 2. delete dependent data
       await supabase.from('complaints').delete().eq('user_id', userId);
-
-      // Delete upvotes
       await supabase.from('upvotes').delete().eq('user_id', userId);
-
-      // Delete notifications
       await supabase.from('notifications').delete().eq('user_id', userId);
 
-      // Delete user from public.users
+      // 3. delete user
       await supabase.from('users').delete().eq('id', userId);
 
-      // Delete auth account
-      await supabase.auth.admin.deleteUser(userId);
-
       // Logout
-      await supabase.auth.signOut();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
 
       if (!mounted) return;
 
@@ -339,6 +340,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: ElevatedButton.icon(
                       onPressed: () async {
                         await supabase.auth.signOut();
+
+                        // VERY IMPORTANT
+                        await supabase.removeAllChannels();
+
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.clear();
 
                         if (!mounted) return;
 
