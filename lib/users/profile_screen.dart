@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:kseb_connect/user_login_screen.dart';
 import '../main.dart'; // supabase client
-import 'package:provider/provider.dart';
-import '../providers/user_data_provider.dart';
 import 'about_us_screen.dart';
+import 'profile_details_screen.dart';
+import 'faq_screen.dart';
+import 'notification_settings_screen.dart';
+import 'feedback_screen.dart';
+import 'main_layout.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -52,6 +55,87 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> deleteAccount() async {
+    final userId = supabase.auth.currentUser!.id;
+
+    try {
+      // Delete consumer connections
+      await supabase
+          .from('consumer_connections')
+          .delete()
+          .eq('user_id', userId);
+
+      // Delete complaints created by user
+      await supabase.from('complaints').delete().eq('user_id', userId);
+
+      // Delete upvotes
+      await supabase.from('upvotes').delete().eq('user_id', userId);
+
+      // Delete notifications
+      await supabase.from('notifications').delete().eq('user_id', userId);
+
+      // Delete user from public.users
+      await supabase.from('users').delete().eq('id', userId);
+
+      // Delete auth account
+      await supabase.auth.admin.deleteUser(userId);
+
+      // Logout
+      await supabase.auth.signOut();
+
+      if (!mounted) return;
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+    } catch (e) {
+      debugPrint("Delete error: $e");
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Failed to delete account")));
+    }
+  }
+
+  Future<void> confirmDeleteAccount() async {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Delete Account"),
+
+          content: const Text(
+            "Are you sure you want to delete your account? This action cannot be undone.",
+          ),
+
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text("Cancel"),
+            ),
+
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF4CA0D9),
+              ),
+
+              onPressed: () async {
+                Navigator.pop(context);
+                await deleteAccount();
+              },
+
+              child: const Text("Delete"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   String _monthName(int month) {
     const months = [
       "Jan",
@@ -68,59 +152,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       "Dec",
     ];
     return months[month - 1];
-  }
-
-  Future<void> showEditNameDialog() async {
-    nameController.text = userName;
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text("Edit Name"),
-
-          content: TextField(
-            controller: nameController,
-            decoration: const InputDecoration(
-              labelText: "Enter new name",
-              border: OutlineInputBorder(),
-            ),
-          ),
-
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: const Text("Cancel"),
-            ),
-
-            ElevatedButton(
-              onPressed: () async {
-                final newName = nameController.text.trim();
-
-                if (newName.isEmpty) return;
-
-                final userId = supabase.auth.currentUser!.id;
-
-                await context.read<UserDataProvider>().updateUserName(
-                  userId,
-                  newName,
-                );
-
-                setState(() {
-                  userName = newName;
-                });
-
-                Navigator.pop(context);
-              },
-
-              child: const Text("Save"),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   @override
@@ -168,7 +199,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            "Ownest member since $joinDate",
+                            "Member since $joinDate",
                             style: TextStyle(
                               fontSize: 13,
                               color: Colors.grey[600],
@@ -191,11 +222,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                   _buildSectionHeader("Manage"),
                   _buildListContainer([
-                    _buildListTile(Icons.notes, "My Complaints", onTap: () {}),
+                    _buildListTile(
+                      Icons.notes,
+                      "My Complaints",
+                      onTap: () {
+                        MainLayout.openMyComplaints();
+                      },
+                    ),
                     _buildListTile(
                       Icons.account_balance_wallet_outlined,
                       "Profile",
-                      onTap: showEditNameDialog,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ProfileDetailsScreen(),
+                          ),
+                        );
+                      },
                     ),
                   ]),
 
@@ -211,12 +255,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     _buildListTile(
                       Icons.notifications_none,
                       "Notification settings",
-                      onTap: () {},
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const NotificationSettingsScreen(),
+                          ),
+                        );
+                      },
                     ),
                     _buildListTile(
                       Icons.help_outline,
                       "Feedback",
-                      onTap: () {},
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => FeedbackScreen(
+                              userName: userName,
+                              phoneNumber: phoneNumber,
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ]),
 
@@ -239,7 +300,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     _buildListTile(
                       Icons.question_answer_outlined,
                       "FAQ",
-                      onTap: () {},
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const FAQScreen()),
+                        );
+                      },
                     ),
                   ]),
 
@@ -249,7 +315,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     width: double.infinity,
                     height: 50,
                     child: OutlinedButton.icon(
-                      onPressed: () {},
+                      onPressed: confirmDeleteAccount,
                       icon: const Icon(
                         Icons.delete_outline,
                         color: Colors.grey,
@@ -257,7 +323,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       label: const Text(
                         "Delete my account",
                         style: TextStyle(
-                          color: Colors.grey,
+                          color: Colors.black,
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
