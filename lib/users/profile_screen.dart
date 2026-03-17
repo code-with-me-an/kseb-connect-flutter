@@ -3,6 +3,7 @@ import 'package:kseb_connect/user_login_screen.dart';
 import '../main.dart'; // supabase client
 import 'about_us_screen.dart';
 import 'profile_details_screen.dart';
+import 'faq_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -96,45 +97,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> confirmDeleteAccount() async {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Delete Account"),
 
-  showDialog(
-    context: context,
-    builder: (context) {
-
-      return AlertDialog(
-        title: const Text("Delete Account"),
-
-        content: const Text(
-          "Are you sure you want to delete your account? This action cannot be undone.",
-        ),
-
-        actions: [
-
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: const Text("Cancel"),
+          content: const Text(
+            "Are you sure you want to delete your account? This action cannot be undone.",
           ),
 
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text("Cancel"),
             ),
 
-            onPressed: () async {
-              Navigator.pop(context);
-              await deleteAccount();
-            },
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF4CA0D9),
+              ),
 
-            child: const Text("Delete"),
-          ),
+              onPressed: () async {
+                Navigator.pop(context);
+                await deleteAccount();
+              },
 
-        ],
-      );
-    },
-  );
-}
+              child: const Text("Delete"),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   String _monthName(int month) {
     const months = [
@@ -199,7 +196,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            "Ownest member since $joinDate",
+                            "Member since $joinDate",
                             style: TextStyle(
                               fontSize: 13,
                               color: Colors.grey[600],
@@ -277,7 +274,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     _buildListTile(
                       Icons.question_answer_outlined,
                       "FAQ",
-                      onTap: () {},
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const FAQScreen()),
+                        );
+                      },
                     ),
                   ]),
 
