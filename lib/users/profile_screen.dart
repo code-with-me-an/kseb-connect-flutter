@@ -6,6 +6,7 @@ import 'profile_details_screen.dart';
 import 'faq_screen.dart';
 import 'notification_settings_screen.dart';
 import 'feedback_screen.dart';
+import 'main_layout.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -221,7 +222,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                   _buildSectionHeader("Manage"),
                   _buildListContainer([
-                    _buildListTile(Icons.notes, "My Complaints", onTap: () {}),
+                    _buildListTile(
+                      Icons.notes,
+                      "My Complaints",
+                      onTap: () {
+                        MainLayout.openMyComplaints();
+                      },
+                    ),
                     _buildListTile(
                       Icons.account_balance_wallet_outlined,
                       "Profile",

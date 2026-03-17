@@ -14,6 +14,10 @@ class MainLayout extends StatefulWidget {
     _MainLayoutState.instance?.openNearbyComplaint(lat, lng);
   }
 
+  static void openMyComplaints() {
+    _MainLayoutState.instance?.openMyComplaints();
+  }
+
   @override
   State<MainLayout> createState() => _MainLayoutState();
 }
@@ -79,6 +83,12 @@ class _MainLayoutState extends State<MainLayout> {
     });
 
     mapKey.currentState?.focusComplaint(lat, lng);
+  }
+
+  void openMyComplaints() {
+    setState(() {
+      _currentIndex = 1;
+    });
   }
 
   @override
