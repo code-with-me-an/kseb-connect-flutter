@@ -74,18 +74,8 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
 
   String _monthName(int month) {
     const months = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
+      "Jan","Feb","Mar","Apr","May","Jun",
+      "Jul","Aug","Sep","Oct","Nov","Dec"
     ];
     return months[month - 1];
   }
@@ -117,34 +107,74 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
           ? const Center(
               child: CircularProgressIndicator(color: Color(0xFF0D3B66)),
             )
-          : Padding(
+          : SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
-                  const CircleAvatar(
-                    radius: 45,
-                    backgroundColor: Colors.grey,
-                    child: Icon(Icons.person, size: 55, color: Colors.white),
+
+                  // Profile Header Card
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 25, horizontal: 20),
+
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+
+                    child: Column(
+                      children: [
+
+                        const CircleAvatar(
+                          radius: 45,
+                          backgroundColor: Color(0xFFE0E0E0),
+                          child: Icon(
+                            Icons.person,
+                            size: 55,
+                            color: Colors.white,
+                          ),
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        Text(
+                          userName,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+
+                        const SizedBox(height: 4),
+
+                        Text(
+                          "Member since $joinDate",
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
 
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 25),
 
-                  _buildProfileTile("Name", userName),
+                  // Profile Details
+                  _buildProfileTile(Icons.phone, "Mobile Number", phoneNumber),
 
-                  _buildProfileTile("Member Since", joinDate),
+                  _buildProfileTile(Icons.confirmation_number,
+                      "Consumer Number", consumerNumber),
 
-                  _buildProfileTile("Mobile Number", phoneNumber),
-
-                  _buildProfileTile("Consumer Number", consumerNumber),
-
-                  _buildProfileTile("Section", sectionName),
+                  _buildProfileTile(
+                      Icons.location_city, "Section", sectionName),
                 ],
               ),
             ),
     );
   }
 
-  Widget _buildProfileTile(String title, String value) {
+  Widget _buildProfileTile(IconData icon, String title, String value) {
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
       padding: const EdgeInsets.all(16),
@@ -155,14 +185,40 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen> {
       ),
 
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            title,
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+
+          Icon(
+            icon,
+            color: const Color(0xFF0D3B66),
           ),
 
-          Text(value, style: const TextStyle(fontSize: 15, color: Colors.grey)),
+          const SizedBox(width: 15),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey,
+                  ),
+                ),
+
+                const SizedBox(height: 3),
+
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

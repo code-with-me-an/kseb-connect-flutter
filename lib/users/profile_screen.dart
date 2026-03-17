@@ -4,6 +4,8 @@ import '../main.dart'; // supabase client
 import 'about_us_screen.dart';
 import 'profile_details_screen.dart';
 import 'faq_screen.dart';
+import 'notification_settings_screen.dart';
+import 'feedback_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -246,12 +248,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     _buildListTile(
                       Icons.notifications_none,
                       "Notification settings",
-                      onTap: () {},
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const NotificationSettingsScreen(),
+                          ),
+                        );
+                      },
                     ),
                     _buildListTile(
                       Icons.help_outline,
                       "Feedback",
-                      onTap: () {},
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => FeedbackScreen(
+                              userName: userName,
+                              phoneNumber: phoneNumber,
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ]),
 
