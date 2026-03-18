@@ -6,22 +6,40 @@ import 'admin_dashboard.dart';
 import 'package:kseb_connect/admin/admin_section_map_screen.dart';
 
 class AdminLayout extends StatefulWidget {
-  const AdminLayout({super.key});
+  final int initialIndex;
+  final String? highlightComplaintId;
+  final String? highlightComplaintType;
+
+  const AdminLayout({
+    super.key,
+    this.initialIndex = 0,
+    this.highlightComplaintId,
+    this.highlightComplaintType,
+  });
 
   @override
   State<AdminLayout> createState() => _AdminLayoutState();
 }
 
 class _AdminLayoutState extends State<AdminLayout> {
-  int _currentIndex = 0;
+  late int _currentIndex;
+@override
+void initState() {
+  super.initState();
+  _currentIndex = widget.initialIndex;
 
-  // Admin specific screens
-  final List<Widget> _screens = const [
-    AdminDashboard(), // The dashboard we just made
-    ComplaintsListScreen(),
-    AdminSectionMapScreen(),
-    AdminProfileScreen(),
+  _screens = [
+    const AdminDashboard(),
+    ComplaintsListScreen(
+      highlightComplaintId: widget.highlightComplaintId,
+      highlightComplaintType: widget.highlightComplaintType,
+    ),
+    const AdminSectionMapScreen(),
+    const AdminProfileScreen(),
   ];
+}
+  // Admin specific screens
+ late final List<Widget> _screens;
 
   final List<String> _titles = const [
     "Admin Dashboard",

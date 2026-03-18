@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'complaints_list_screen.dart';
-
+import 'main_layout.dart';
 class AdminSectionMapScreen extends StatefulWidget {
   const AdminSectionMapScreen({super.key});
 
@@ -257,15 +257,17 @@ class _AdminSectionMapScreenState extends State<AdminSectionMapScreen> {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ComplaintsListScreen(
-                      highlightComplaintId: complaint['complaint_id'],
-                      highlightComplaintType: complaint['complaint_type'],
-                    ),
-                  ),
-                );
+              Navigator.pushAndRemoveUntil(
+  context,
+  MaterialPageRoute(
+    builder: (_) => AdminLayout(
+      initialIndex: 1, // Complaints tab
+      highlightComplaintId: complaint['complaint_id'],
+      highlightComplaintType: complaint['complaint_type'],
+    ),
+  ),
+  (route) => false,
+);
               },
               child: const Text("View / Edit"),
             ),
