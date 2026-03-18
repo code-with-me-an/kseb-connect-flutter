@@ -55,6 +55,11 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
   Future<void> _logout() async {
     final prefs = await SharedPreferences.getInstance();
 
+    //Stop Supabase realtime
+    await supabase.auth.signOut();
+    await supabase.removeAllChannels();
+
+    //Clear local session
     await prefs.remove('admin_logged_in');
     await prefs.remove('admin_id');
     await prefs.remove('admin_username');
@@ -76,7 +81,9 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     return Scaffold(
       backgroundColor: backgroundGrey,
       body: loading
-          ? const Center(child: CircularProgressIndicator(color: adminThemeColor))
+          ? const Center(
+              child: CircularProgressIndicator(color: adminThemeColor),
+            )
           : adminData == null
           ? const Center(child: Text("Admin data not found"))
           : SingleChildScrollView(
