@@ -48,7 +48,7 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
          
             const SizedBox(height: 16),
 
-            // 📄 DETAILS CARD
+            // DETAILS CARD
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -58,7 +58,7 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                children: [
-  // 🖼 IMAGE (only if exists)
+  // IMAGE (only if exists)
   if (imageUrl != null && imageUrl.isNotEmpty) ...[
     ClipRRect(
       borderRadius: BorderRadius.circular(16),
@@ -71,7 +71,7 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
     const SizedBox(height: 16),
   ],
 
-  // 📄 DETAILS CARD
+  // DETAILS CARD
   Container(
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
@@ -152,7 +152,7 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
 
   const SizedBox(height: 20),
 
-  // ✏️ EDIT BUTTON
+  // EDIT BUTTON
   SizedBox(
     width: double.infinity,
     child: ElevatedButton.icon(

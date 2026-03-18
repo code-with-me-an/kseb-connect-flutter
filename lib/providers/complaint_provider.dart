@@ -4,7 +4,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:math';
 
-import '../services/realtime_service.dart';
+import '../services/user_realtime_service.dart';
 
 class ComplaintProvider extends ChangeNotifier {
   final supabase = Supabase.instance.client;
@@ -149,29 +149,27 @@ class ComplaintProvider extends ChangeNotifier {
   // ===============================
 
   void startRealtime() {
-    if (_realtimeStarted) return;
+  if (_realtimeStarted) return;
 
-    _realtimeStarted = true;
+  _realtimeStarted = true;
 
-    /// new complaints
-    RealtimeService.onComplaint = (data) async {
-      final id = data['complaint_id'];
+  /// complaints (insert + update)
+  UserRealtimeService.onComplaint = (data) async {
+    final id = data['complaint_id'];
 
-      final index = complaints.indexWhere((c) => c['complaint_id'] == id);
+    final index = complaints.indexWhere((c) => c['complaint_id'] == id);
 
-      // If complaint already exists → update status
-      if (index != -1) {
-        complaints[index]['status'] = data['status'];
+    if (index != -1) {
+      complaints[index]['status'] = data['status'];
 
-        await updateNearbyComplaints();
+      await updateNearbyComplaints();
+      notifyListeners();
+      return;
+    }
 
-        return;
-      }
-
-      // If new complaint → fetch full record
-      final response = await supabase
-          .from('complaints')
-          .select('''
+    final response = await supabase
+        .from('complaints')
+        .select('''
         complaint_id,
         user_id,
         complaint_type,
@@ -184,30 +182,32 @@ class ComplaintProvider extends ChangeNotifier {
         created_at,
         upvotes(count)
       ''')
-          .eq('complaint_id', id)
-          .single();
+        .eq('complaint_id', id)
+        .single();
 
-      complaints.insert(0, response);
+    complaints.insert(0, response);
 
-      await updateNearbyComplaints();
-    };
+    await updateNearbyComplaints();
+    notifyListeners();
+  };
 
-    /// realtime upvotes
-    RealtimeService.onUpvote = (data) {
-      final id = data['complaint_id'];
+  /// upvotes
+  UserRealtimeService.onUpvote = (data) {
+    final id = data['complaint_id'];
 
-      for (var c in complaints) {
-        if (c['complaint_id'] == id) {
-          final upvoteList = c['upvotes'] as List?;
-          if (upvoteList != null && upvoteList.isNotEmpty) {
-            upvoteList[0]['count'] += 1;
-          }
+    for (var c in complaints) {
+      if (c['complaint_id'] == id) {
+        final upvoteList = c['upvotes'] as List?;
+        if (upvoteList != null && upvoteList.isNotEmpty) {
+          upvoteList[0]['count'] += 1;
         }
       }
+    }
 
-      updateNearbyComplaints();
-    };
-  }
+    updateNearbyComplaints();
+    notifyListeners();
+  };
+}
 
   // ===============================
   // USER COMPLAINTS

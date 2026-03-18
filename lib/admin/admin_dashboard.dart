@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:kseb_connect/main.dart';
+import 'package:kseb_connect/providers/admin_dashboard_provider.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -11,16 +13,9 @@ class AdminDashboard extends StatefulWidget {
 }
 
 class _AdminDashboardState extends State<AdminDashboard> {
-  final supabase = Supabase.instance.client;
-
-  int totalCount = 0;
-  int pendingCount = 0;
-  int inProgressCount = 0;
-  int resolvedCount = 0;
   int expiryDays = 1;
   DateTime? customExpiryDate;
 
-  bool loading = true;
   bool sending = false;
   bool isImportantAlert = false;
 
@@ -36,7 +31,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   @override
   void initState() {
     super.initState();
-    fetchComplaintStats();
+    context.read<AdminDashboardProvider>().loadDashboard();
   }
 
   Future<void> pickCustomExpiryDate() async {
@@ -195,59 +190,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Future<void> fetchComplaintStats() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final sectionId = prefs.getString('admin_section_id');
-
-      if (sectionId == null) {
-        setState(() => loading = false);
-        return;
-      }
-
-      final response = await supabase
-          .from('complaints')
-          .select('status')
-          .eq('section_id', sectionId);
-
-      int total = response.length;
-      int pending = 0;
-      int inProgress = 0;
-      int resolved = 0;
-
-      for (var complaint in response) {
-        final status = complaint['status'];
-
-        if (status == 'pending') {
-          pending++;
-        } else if (status == 'in-progress') {
-          inProgress++;
-        } else if (status == 'resolved') {
-          resolved++;
-        }
-      }
-
-      setState(() {
-        totalCount = total;
-        pendingCount = pending;
-        inProgressCount = inProgress;
-        resolvedCount = resolved;
-        loading = false;
-      });
-    } catch (e) {
-      setState(() => loading = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     const backgroundGrey = Color(0xFFF2F2F2);
     const orangeColor = Color(0xFFF09E00);
     const lightBlueColor = Color(0xFF2196F3);
+    final provider = context.watch<AdminDashboardProvider>();
 
     return Scaffold(
       backgroundColor: backgroundGrey,
-      body: loading
+      body: provider.loading
           // Changed loading indicator color to green
           ? const Center(child: CircularProgressIndicator(color: greenColor))
           : SingleChildScrollView(
@@ -262,7 +214,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         child: _buildGridStatCard(
                           icon: Icons.assignment,
                           iconColor: blueColor,
-                          count: totalCount.toString(),
+                          count: provider.total.toString(),
                           label: "Total Complaints",
                         ),
                       ),
@@ -271,7 +223,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         child: _buildGridStatCard(
                           icon: Icons.hourglass_empty,
                           iconColor: orangeColor,
-                          count: pendingCount.toString(),
+                          count: provider.pending.toString(),
                           label: "Pending",
                         ),
                       ),
@@ -284,7 +236,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         child: _buildGridStatCard(
                           icon: Icons.settings,
                           iconColor: lightBlueColor,
-                          count: inProgressCount.toString(),
+                          count: provider.inProgress.toString(),
                           label: "In Progress",
                         ),
                       ),
@@ -293,7 +245,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         child: _buildGridStatCard(
                           icon: Icons.check_circle_outline,
                           iconColor: greenColor,
-                          count: resolvedCount.toString(),
+                          count: provider.resolved.toString(),
                           label: "Resolved",
                         ),
                       ),
@@ -321,7 +273,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     cursorColor: greenColor, // Changed cursor color
                     decoration: InputDecoration(
                       labelText: "Title",
-                      floatingLabelStyle: const TextStyle(color: greenColor), // Changed floating label color
+                      floatingLabelStyle: const TextStyle(
+                        color: greenColor,
+                      ), // Changed floating label color
                       hintText: "Enter title",
                       filled: true,
                       fillColor: Colors.white,
@@ -344,7 +298,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     cursorColor: greenColor, // Changed cursor color
                     decoration: InputDecoration(
                       labelText: "Message",
-                      floatingLabelStyle: const TextStyle(color: greenColor), // Changed floating label color
+                      floatingLabelStyle: const TextStyle(
+                        color: greenColor,
+                      ), // Changed floating label color
                       hintText: "Enter your message here...",
                       filled: true,
                       fillColor: Colors.white,
@@ -361,7 +317,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   const SizedBox(height: 15),
 
                   // expire dropdown
-        
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -388,7 +343,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           child: DropdownButton<int>(
                             value: expiryDays,
                             isExpanded: true, // Prevents overflow
-                            icon: const Icon(Icons.keyboard_arrow_down, color: Colors.grey),
+                            icon: const Icon(
+                              Icons.keyboard_arrow_down,
+                              color: Colors.grey,
+                            ),
                             dropdownColor: Colors.white,
                             borderRadius: BorderRadius.circular(15),
                             style: const TextStyle(
@@ -399,7 +357,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                               DropdownMenuItem(value: 1, child: Text("1 Day")),
                               DropdownMenuItem(value: 2, child: Text("2 Days")),
                               DropdownMenuItem(value: 3, child: Text("3 Days")),
-                              DropdownMenuItem(value: 0, child: Text("Custom Date")),
+                              DropdownMenuItem(
+                                value: 0,
+                                child: Text("Custom Date"),
+                              ),
                             ],
                             onChanged: (val) async {
                               if (val == 0) {
@@ -416,7 +377,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       ),
                     ],
                   ),
-                  
+
                   if (customExpiryDate != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 10),
@@ -431,8 +392,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
                   const SizedBox(height: 20),
 
-
-                   //Alert Checkbox
+                  //Alert Checkbox
                   Row(
                     children: [
                       SizedBox(
@@ -440,7 +400,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         width: 24,
                         child: Checkbox(
                           value: isImportantAlert,
-                          activeColor: greenColor, 
+                          activeColor: greenColor,
                           onChanged: (val) {
                             setState(() => isImportantAlert = val ?? false);
                           },

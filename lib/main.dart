@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:kseb_connect/providers/admin_complaint_provider.dart';
+import 'package:kseb_connect/providers/admin_dashboard_provider.dart';
 import 'package:kseb_connect/providers/complaint_provider.dart';
 import 'package:kseb_connect/providers/home_provider.dart';
-import 'package:kseb_connect/services/realtime_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
@@ -17,6 +18,9 @@ import 'services/local_notification_service.dart';
 import 'users/notification_detail_screen.dart';
 import 'admin/admin_notification_screen.dart';
 
+import 'package:kseb_connect/services/user_realtime_service.dart';
+import 'package:kseb_connect/services/admin_realtime_service.dart';
+
 /// Global navigator key
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -30,8 +34,6 @@ Future<void> main() async {
     url: 'https://ozfkdvalelvgrygihqxr.supabase.co',
     anonKey: 'sb_publishable_XVYY0q-iNacej703cOQmqA_vZ9PBryl',
   );
-
-  /// Start realtime system
 
   /// Initialize local notifications
   await LocalNotificationService.initialize((payload) async {
@@ -65,6 +67,8 @@ Future<void> main() async {
         ChangeNotifierProvider(
           create: (_) => SectionProvider()..loadSections(),
         ),
+        ChangeNotifierProvider(create: (_) => AdminDashboardProvider()),
+        ChangeNotifierProvider(create: (_) => AdminComplaintProvider()),
       ],
       child: const MyApp(),
     ),
@@ -92,21 +96,23 @@ class _MyAppState extends State<MyApp> {
   Future<void> _decideStartScreen() async {
     final prefs = await SharedPreferences.getInstance();
 
-    /// ADMIN SESSION
+    // ADMIN SESSION
     final isAdminLoggedIn = prefs.getBool('admin_logged_in') ?? false;
 
-    /// USER SESSION
+    // USER SESSION
     final keepSignedIn = prefs.getBool('keepSignedIn') ?? false;
     final userLoggedIn = keepSignedIn && supabase.auth.currentUser != null;
 
+    // IMPORTANT: CLEAR OLD CHANNELS FIRST
+    await supabase.removeAllChannels();
+
     if (isAdminLoggedIn) {
-      /// Admin interface
+      AdminRealtimeService.start(); // ADMIN ONLY
       _startScreen = const AdminLayout();
     } else if (userLoggedIn) {
-      /// User interface
+      final userId = supabase.auth.currentUser!.id;
       _startScreen = const MainLayout();
     } else {
-      /// Login screen
       _startScreen = const LoginScreen();
     }
 

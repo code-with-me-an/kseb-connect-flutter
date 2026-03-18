@@ -340,8 +340,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: ElevatedButton.icon(
                       onPressed: () async {
                         await supabase.auth.signOut();
-
-                        // VERY IMPORTANT
                         await supabase.removeAllChannels();
 
                         final prefs = await SharedPreferences.getInstance();

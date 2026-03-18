@@ -3,7 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:geocoding/geocoding.dart';
 
 import '../services/location_service.dart';
-import '../services/realtime_service.dart';
+import '../services/user_realtime_service.dart';
 import '../services/local_notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -49,7 +49,7 @@ class HomeProvider extends ChangeNotifier {
       notifications = results[2] as List<Map<String, dynamic>>;
 
       /// start realtime listener
-      _connectRealtime();
+      _connectRealtime(userId);
     } catch (e) {
       debugPrint("Home load error: $e");
     }
@@ -62,21 +62,19 @@ class HomeProvider extends ChangeNotifier {
   // CONNECT REALTIME
   // =====================================================
 
-  void _connectRealtime() {
+  void _connectRealtime(String userId) {
     if (_realtimeConnected) return;
 
     _realtimeConnected = true;
+    UserRealtimeService.start(userId, userSectionIds);
 
-    RealtimeService.onNotification = (notification) {
-      // only section announcement reach the user
-
+    UserRealtimeService.onNotification = (notification) {
       if (notification['recipient_type'] != 'section') return;
 
       final sectionId = notification['section_id']?.toString();
 
       if (!userSectionIds.contains(sectionId)) return;
 
-      /// avoid duplicate notifications
       final exists = notifications.any(
         (n) => n['notification_id'] == notification['notification_id'],
       );
@@ -89,6 +87,7 @@ class HomeProvider extends ChangeNotifier {
       ];
 
       notifyListeners();
+
       LocalNotificationService.showNotification(
         title: notification['title'] ?? "Alert",
         body: notification['message'] ?? "",
