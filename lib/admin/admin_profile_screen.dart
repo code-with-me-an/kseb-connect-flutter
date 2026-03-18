@@ -51,7 +51,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     }
   }
 
-  /// 🔹 LOGOUT FUNCTION
+  // LOGOUT FUNCTION
   Future<void> _logout() async {
     final prefs = await SharedPreferences.getInstance();
 
