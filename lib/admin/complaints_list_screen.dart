@@ -21,8 +21,8 @@ class ComplaintsListScreen extends StatefulWidget {
 class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
   // Toggle State: true = Community, false = Personal
   bool isCommunitySelected = true;
-
- @override
+String? _activeHighlightId;
+@override
 void initState() {
   super.initState();
 
@@ -30,6 +30,18 @@ void initState() {
     isCommunitySelected = false;
   } else {
     isCommunitySelected = true;
+  }
+
+  _activeHighlightId = widget.highlightComplaintId;
+
+  if (_activeHighlightId != null) {
+    Future.delayed(const Duration(seconds: 4), () {
+      if (mounted) {
+        setState(() {
+          _activeHighlightId = null;
+        });
+      }
+    });
   }
 
   _initialize();
@@ -368,7 +380,7 @@ Future<String> _getLocationName(dynamic lat, dynamic lng) async {
   latitude: complaint['latitude'],                  
   longitude: complaint['longitude'],                
   locationName: complaint['location_name'],         
-  highlight: widget.highlightComplaintId == complaint['complaint_id'],
+  highlight: _activeHighlightId == complaint['complaint_id'],
 );
     }).toList();
   }
@@ -396,7 +408,7 @@ Future<String> _getLocationName(dynamic lat, dynamic lng) async {
   latitude: complaint['latitude'],                  
   longitude: complaint['longitude'],                
   locationName: complaint['location_name'],
-  highlight: widget.highlightComplaintId == complaint['complaint_id'],
+  highlight: _activeHighlightId == complaint['complaint_id'],
 );
     }).toList();
   }
