@@ -21,7 +21,8 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
     final description = widget.complaint['description'] ?? "";
     final status = widget.complaint['status'] ?? "pending";
     final location = widget.complaint['location_name'] ?? "Not available";
-
+    final consumerName = widget.complaint['consumer_name'];
+final consumerNumber = widget.complaint['consumer_number'];
     Color statusColor;
     IconData statusIcon;
 
@@ -99,7 +100,19 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
           category,
           style: const TextStyle(fontSize: 16),
         ),
+      if (consumerName != null && consumerNumber != null) ...[
+  const Divider(height: 24),
 
+  const Text("Consumer Name:",
+      style: TextStyle(fontSize: 16)),
+  Text(consumerName),
+const Divider(height: 24),
+  const SizedBox(height: 10),
+
+  const Text("Consumer Number:",
+      style: TextStyle(fontSize: 16)),
+  Text(consumerNumber),
+],
         const Divider(height: 24),
 
         const Text("Description:",

@@ -135,7 +135,7 @@ void initState() {
     try {
       final response = await supabase
           .from('complaints')
-          .select()
+          .select('*, consumer_connections(name, consumer_number)')
           .eq('section_id', officerSectionId!)
           .eq('complaint_type', 'personal')
           .order('created_at', ascending: true);
@@ -408,6 +408,8 @@ Future<String> _getLocationName(dynamic lat, dynamic lng) async {
   latitude: complaint['latitude'],                  
   longitude: complaint['longitude'],                
   locationName: complaint['location_name'],
+  consumerName: complaint['consumer_connections']?['name'],
+consumerNumber: complaint['consumer_connections']?['consumer_number'],
   highlight: _activeHighlightId == complaint['complaint_id'],
 );
     }).toList();
@@ -425,7 +427,9 @@ Widget _buildComplaintCard({
    required String description,     
   dynamic latitude,                
   dynamic longitude,               
-  String? locationName,        
+  String? locationName, 
+  String? consumerName,
+String? consumerNumber,       
   bool highlight = false,
 }) {
   Color statusColor;
@@ -467,6 +471,8 @@ Widget _buildComplaintCard({
           'description': description,
           'status': status,
           'location_name': finalLocation,
+          'consumer_name': consumerName,
+'consumer_number': consumerNumber,
         },
       ),
     ),
