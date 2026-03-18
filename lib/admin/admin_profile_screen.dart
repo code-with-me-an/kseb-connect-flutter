@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:kseb_connect/user_login_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'admin_edit_profile_screen.dart';
 
 class AdminProfileScreen extends StatefulWidget {
   const AdminProfileScreen({super.key});
@@ -77,68 +78,82 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : adminData == null
-              ? const Center(child: Text("Admin data not found"))
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(
-                      vertical: 30, horizontal: 20),
-                  child: Column(
-                    children: [
-                      /// PROFILE AVATAR
-                      CircleAvatar(
-                        radius: 60,
-                        backgroundColor: Colors.grey[400],
-                        child: const Icon(
-                          Icons.person,
-                          size: 80,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-
-                      /// NAME
-                      Text(
-                        adminData!['name'] ?? "Admin",
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-
-                      const SizedBox(height: 30),
-
-                      /// INFO
-                      _buildInfoRow(Icons.phone,
-                          adminData!['mobile'] ?? "Not Available"),
-                      _buildInfoRow(Icons.email,
-                          adminData!['email'] ?? "Not Available"),
-                      _buildInfoRow(Icons.person,
-                          "Username: ${adminData!['username'] ?? ""}"),
-
-                      const SizedBox(height: 40),
-
-                      /// EDIT PROFILE (placeholder for now)
-                      _buildActionButton(
-                        icon: Icons.edit,
-                        iconColor: adminThemeColor,
-                        text: "Edit Profile",
-                        onTap: () {
-                          // You can navigate to edit screen later
-                        },
-                      ),
-
-                      const SizedBox(height: 15),
-
-                      /// LOGOUT BUTTON
-                      _buildActionButton(
-                        icon: Icons.power_settings_new,
-                        iconColor: Colors.red,
-                        text: "Logout",
-                        onTap: _logout,
-                      ),
-                    ],
+          ? const Center(child: Text("Admin data not found"))
+          : SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
+              child: Column(
+                children: [
+                  /// PROFILE AVATAR
+                  CircleAvatar(
+                    radius: 60,
+                    backgroundColor: Colors.grey[400],
+                    child: const Icon(
+                      Icons.person,
+                      size: 80,
+                      color: Colors.white,
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 20),
+
+                  /// NAME
+                  Text(
+                    adminData!['name'] ?? "Admin",
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+
+                  const SizedBox(height: 30),
+
+                  /// INFO
+                  _buildInfoRow(
+                    Icons.phone,
+                    adminData!['mobile'] ?? "Not Available",
+                  ),
+                  _buildInfoRow(
+                    Icons.email,
+                    adminData!['email'] ?? "Not Available",
+                  ),
+                  _buildInfoRow(
+                    Icons.person,
+                    "Username: ${adminData!['username'] ?? ""}",
+                  ),
+
+                  const SizedBox(height: 40),
+
+                  /// EDIT PROFILE (placeholder for now)
+                  _buildActionButton(
+                    icon: Icons.edit,
+                    iconColor: adminThemeColor,
+                    text: "Edit Profile",
+                    onTap: () async {
+                      final updated = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AdminEditProfileScreen(),
+                        ),
+                      );
+
+                      if (updated == true) {
+                        _fetchAdminData(); // refresh profile
+                      }
+                    },
+                  ),
+
+                  const SizedBox(height: 15),
+
+                  /// LOGOUT BUTTON
+                  _buildActionButton(
+                    icon: Icons.power_settings_new,
+                    iconColor: Colors.red,
+                    text: "Logout",
+                    onTap: _logout,
+                  ),
+                ],
+              ),
+            ),
     );
   }
 
@@ -153,10 +168,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
           Flexible(
             child: Text(
               text,
-              style: const TextStyle(
-                fontSize: 16,
-                color: Colors.black87,
-              ),
+              style: const TextStyle(fontSize: 16, color: Colors.black87),
             ),
           ),
         ],
@@ -181,7 +193,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
           boxShadow: [
             BoxShadow(
               // ignore: deprecated_member_use
-              color: Colors.black.withValues(alpha:0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, 2),
             ),
@@ -201,8 +213,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                 ),
               ),
             ),
-            const Icon(Icons.arrow_forward_ios,
-                size: 18, color: Colors.grey),
+            const Icon(Icons.arrow_forward_ios, size: 18, color: Colors.grey),
           ],
         ),
       ),

@@ -4,7 +4,6 @@ import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'complaints_list_screen.dart';
 import 'main_layout.dart';
 class AdminSectionMapScreen extends StatefulWidget {
   const AdminSectionMapScreen({super.key});
