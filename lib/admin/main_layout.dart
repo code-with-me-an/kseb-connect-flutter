@@ -4,17 +4,18 @@ import 'package:kseb_connect/admin/admin_profile_screen.dart';
 import 'package:kseb_connect/admin/complaints_list_screen.dart';
 import 'admin_dashboard.dart';
 import 'package:kseb_connect/admin/admin_section_map_screen.dart';
-
+import 'package:kseb_connect/admin/complaint_detail_screen.dart';
 class AdminLayout extends StatefulWidget {
   final int initialIndex;
   final String? highlightComplaintId;
   final String? highlightComplaintType;
-
+  final Map<String, dynamic>? complaintData;
   const AdminLayout({
     super.key,
     this.initialIndex = 0,
     this.highlightComplaintId,
     this.highlightComplaintType,
+    this.complaintData,
   });
 
   @override
@@ -46,6 +47,7 @@ void initState() {
     "All Complaints",
     "Area Map",
     "Admin Profile",
+    "Complaint Details",
   ];
 
   @override
@@ -60,7 +62,9 @@ void initState() {
         centerTitle: true,
         automaticallyImplyLeading: false, // Hides back button
         title: Text(
-          _titles[_currentIndex],
+  widget.complaintData != null
+      ? "Complaint Details"
+      : _titles[_currentIndex],
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w500,
@@ -84,7 +88,9 @@ void initState() {
       ),
 
       // Body
-      body: IndexedStack(index: _currentIndex, children: _screens),
+      body: widget.complaintData != null
+    ? ComplaintDetailScreen(complaint: widget.complaintData!)
+    : IndexedStack(index: _currentIndex, children: _screens),
 
       // Bottom Bar
       bottomNavigationBar: BottomNavigationBar(
@@ -93,7 +99,21 @@ void initState() {
         type: BottomNavigationBarType.fixed,
         selectedItemColor: Color(0xFF219869),
         unselectedItemColor: Colors.grey,
-        onTap: (index) => setState(() => _currentIndex = index),
+        onTap: (index) {
+  setState(() {
+    _currentIndex = index;
+  });
+
+  // 🔥 EXIT DETAIL MODE when tab clicked
+  if (widget.complaintData != null) {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AdminLayout(initialIndex: index),
+      ),
+    );
+  }
+},
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.dashboard),

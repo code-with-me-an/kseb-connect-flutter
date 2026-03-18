@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
+import 'complaint_detail_screen.dart';
+import 'main_layout.dart';
+import 'package:geocoding/geocoding.dart';
 class ComplaintsListScreen extends StatefulWidget {
   final String? highlightComplaintId;
   final String? highlightComplaintType;
@@ -196,7 +198,25 @@ _scrollToHighlightedComplaint(personalComplaints);
     debugPrint("Realtime error: $e");
   }
 }
+Future<String> _getLocationName(dynamic lat, dynamic lng) async {
+  try {
+    if (lat == null || lng == null) return "Location not available";
 
+    List<Placemark> placemarks = await placemarkFromCoordinates(
+      lat.toDouble(),
+      lng.toDouble(),
+    );
+
+    final place = placemarks.first;
+
+    return place.locality ??
+        place.subAdministrativeArea ??
+        place.administrativeArea ??
+        "Unknown location";
+  } catch (e) {
+    return "Location not available";
+  }
+}
   final supabase = Supabase.instance.client;
 
   List<Map<String, dynamic>> communityComplaints = [];
@@ -337,14 +357,19 @@ _scrollToHighlightedComplaint(personalComplaints);
       int upvoteCount = complaint['upvote_count'] ?? 0;
 
       return _buildComplaintCard(
-        complaintId: complaint['complaint_id'],
-        title: "Tracking: ${complaint['tracking_code'] ?? ""}",
-        subtitle: "Issue: ${complaint['category'] ?? ""}",
-        detail: "${complaint['description']}\n\nUpvotes: $upvoteCount",
-        status: complaint['status'] ?? "Pending",
-        themeColor: themeColor,
-        highlight: widget.highlightComplaintId == complaint['complaint_id'],
-      );
+  complaintId: complaint['complaint_id'],
+  title: complaint['category'] ?? "",
+  tracking: complaint['tracking_code'] ?? "",
+  imageUrl: complaint['image_url'],
+  upvotes: upvoteCount,
+  status: complaint['status'] ?? "pending",
+  themeColor: themeColor,
+  description: complaint['description'] ?? "",      
+  latitude: complaint['latitude'],                  
+  longitude: complaint['longitude'],                
+  locationName: complaint['location_name'],         
+  highlight: widget.highlightComplaintId == complaint['complaint_id'],
+);
     }).toList();
   }
 
@@ -359,37 +384,91 @@ _scrollToHighlightedComplaint(personalComplaints);
     }
 
     return personalComplaints.map((complaint) {
-      return _buildComplaintCard(
-        complaintId: complaint['complaint_id'],
-        title: "Tracking: ${complaint['tracking_code'] ?? ""}",
-        subtitle: "Issue: ${complaint['category'] ?? ""}",
-        detail: complaint['description'],
-        status: complaint['status'] ?? "Pending",
-        themeColor: themeColor,
-        highlight: widget.highlightComplaintId == complaint['complaint_id'],
-      );
+   return _buildComplaintCard(
+  complaintId: complaint['complaint_id'],
+  title: complaint['category'] ?? "",
+  tracking: complaint['tracking_code'] ?? "",
+  imageUrl: complaint['image_url'],
+  upvotes: 0, // personal doesn't have upvotes
+  status: complaint['status'] ?? "pending",
+  themeColor: themeColor,
+   description: complaint['description'] ?? "",      
+  latitude: complaint['latitude'],                  
+  longitude: complaint['longitude'],                
+  locationName: complaint['location_name'],
+  highlight: widget.highlightComplaintId == complaint['complaint_id'],
+);
     }).toList();
   }
 
   // --- Helper: Complaint Card Widget ---
-  Widget _buildComplaintCard({
-    required String complaintId,
-    required String title,
-    required String subtitle,
-    String? detail,
-    required String status,
-    required Color themeColor,
-    bool highlight = false
-  }) {
-    return Container(
+Widget _buildComplaintCard({
+  required String complaintId,
+  required String title,
+  required String tracking,
+  String? imageUrl,
+  required int upvotes,
+  required String status,
+  required Color themeColor,
+   required String description,     
+  dynamic latitude,                
+  dynamic longitude,               
+  String? locationName,        
+  bool highlight = false,
+}) {
+  Color statusColor;
+  IconData statusIcon;
+
+  switch (status.toLowerCase()) {
+    case "resolved":
+      statusColor = Colors.green;
+      statusIcon = Icons.check_circle;
+      break;
+    case "in-progress":
+      statusColor = Colors.orange;
+      statusIcon = Icons.construction;
+      break;
+    default:
+      statusColor = Colors.grey;
+      statusIcon = Icons.hourglass_bottom;
+  }
+
+  return GestureDetector(
+  onTap: () async {
+  String finalLocation = locationName ?? "";
+
+  // 🔥 If empty → derive from lat/lng
+  if ((finalLocation.isEmpty) && latitude != null && longitude != null) {
+    finalLocation = await _getLocationName(latitude, longitude);
+  }
+
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => AdminLayout(
+        initialIndex: 1,
+        complaintData: {
+          'complaint_id': complaintId,
+          'tracking_code': tracking,
+          'category': title,
+          'image_url': imageUrl,
+          'description': description,
+          'status': status,
+          'location_name': finalLocation,
+        },
+      ),
+    ),
+  );
+},
+    child: Stack(
+  children: [
+    Container(
       margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: highlight ? Colors.yellow[100] : Colors.white,
-  borderRadius: BorderRadius.circular(12),
-  border: highlight
-      ? Border.all(color: Colors.orange, width: 2)
-      : null,
+        borderRadius: BorderRadius.circular(12),
+        border: highlight ? Border.all(color: Colors.orange, width: 2) : null,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
@@ -398,84 +477,143 @@ _scrollToHighlightedComplaint(personalComplaints);
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+
+      child: Row(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    // 🖼 SHOW IMAGE ONLY IF EXISTS
+  if (imageUrl != null && imageUrl.isNotEmpty) ...[
+  Padding(
+    padding: const EdgeInsets.only(top: 6), // 👈 adjust this value
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Image.network(
+        imageUrl,
+        width: 60,
+        height: 60,
+        fit: BoxFit.cover,
+      ),
+    ),
+  ),
+  const SizedBox(width: 12),
+],
+
+    // 📄 DETAILS
+    Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Issue Title
+                Text(
+                  "Issue: $title",
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                  ),
+                ),
+
+                const SizedBox(height: 4),
+
+                // Tracking
+                Text(
+                  "Tracking: $tracking",
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey,
+                  ),
+                ),
+
+                const SizedBox(height: 6),
+Row(
+  children: [
+    // 👍 UPVOTES
+    if (upvotes > 0) ...[
+      const Icon(Icons.thumb_up, size: 14, color: Colors.orange),
+      const SizedBox(width: 4),
+      Text(
+        "$upvotes Upvotes",
+        style: const TextStyle(fontWeight: FontWeight.w500),
+      ),
+      const SizedBox(width: 10),
+    ],
+
+    // 🟢 STATUS
+    Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 8,
+        vertical: 4,
+      ),
+      decoration: BoxDecoration(
+        color: statusColor.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Row 1: Title + Edit Button
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                ),
-              ),
-              GestureDetector(
-                onTap: () {
-                  _showStatusDialog(
-                    complaintId: complaintId,
-                    currentStatus: status,
-                  );
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: themeColor,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Row(
-                    children: const [
-                      Icon(Icons.edit, color: Colors.white, size: 14),
-                      SizedBox(width: 4),
-                      Text(
-                        "Edit",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 8),
-
-          // Row 2: Issue Description
+          Icon(statusIcon, size: 14, color: statusColor),
+          const SizedBox(width: 4),
           Text(
-            subtitle,
-            style: const TextStyle(fontSize: 14, color: Colors.black87),
-          ),
-
-          const SizedBox(height: 8),
-
-          // Row 3: Detail (Complaint Count) or Empty
-          if (detail != null) ...[
-            Text(
-              detail,
-              style: const TextStyle(fontSize: 14, color: Colors.black87),
+            status[0].toUpperCase() + status.substring(1),
+            style: TextStyle(
+              fontSize: 12,
+              color: statusColor,
+              fontWeight: FontWeight.w600,
             ),
-            const SizedBox(height: 8),
-          ],
-
-          // Row 4: Status
-          Text(
-            "Status: $status",
-            style: const TextStyle(fontSize: 14, color: Colors.black87),
           ),
         ],
       ),
-    );
-  }
+    ),
+  ],
+),
+              ],
+            ),
+          ),
+
+         
+          const SizedBox(width: 2),
+
+        ],
+      ),
+    ),
+  Positioned(
+  top: 12,
+  right: 10,
+  child: GestureDetector(
+    onTap: () {
+      _showStatusDialog(
+        complaintId: complaintId,
+        currentStatus: status,
+      );
+    },
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF219869),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          Text(
+            "Edit",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          SizedBox(width: 4),
+          Icon(Icons.edit, color: Colors.white, size: 14),
+        ],
+      ),
+    ),
+  ),
+),
+    ],
+ 
+  ),
+  );
+}
 
   Future<void> _showStatusDialog({
     required String complaintId,
