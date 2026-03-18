@@ -76,7 +76,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     return Scaffold(
       backgroundColor: backgroundGrey,
       body: loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: adminThemeColor))
           : adminData == null
           ? const Center(child: Text("Admin data not found"))
           : SingleChildScrollView(

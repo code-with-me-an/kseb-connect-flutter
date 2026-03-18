@@ -4,18 +4,16 @@ import 'package:kseb_connect/admin/admin_profile_screen.dart';
 import 'package:kseb_connect/admin/complaints_list_screen.dart';
 import 'admin_dashboard.dart';
 import 'package:kseb_connect/admin/admin_section_map_screen.dart';
-import 'package:kseb_connect/admin/complaint_detail_screen.dart';
+
 class AdminLayout extends StatefulWidget {
   final int initialIndex;
   final String? highlightComplaintId;
   final String? highlightComplaintType;
-  final Map<String, dynamic>? complaintData;
   const AdminLayout({
     super.key,
     this.initialIndex = 0,
     this.highlightComplaintId,
     this.highlightComplaintType,
-    this.complaintData,
   });
 
   @override
@@ -24,23 +22,24 @@ class AdminLayout extends StatefulWidget {
 
 class _AdminLayoutState extends State<AdminLayout> {
   late int _currentIndex;
-@override
-void initState() {
-  super.initState();
-  _currentIndex = widget.initialIndex;
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
 
-  _screens = [
-    const AdminDashboard(),
-    ComplaintsListScreen(
-      highlightComplaintId: widget.highlightComplaintId,
-      highlightComplaintType: widget.highlightComplaintType,
-    ),
-    const AdminSectionMapScreen(),
-    const AdminProfileScreen(),
-  ];
-}
+    _screens = [
+      const AdminDashboard(),
+      ComplaintsListScreen(
+        highlightComplaintId: widget.highlightComplaintId,
+        highlightComplaintType: widget.highlightComplaintType,
+      ),
+      const AdminSectionMapScreen(),
+      const AdminProfileScreen(),
+    ];
+  }
+
   // Admin specific screens
- late final List<Widget> _screens;
+  late final List<Widget> _screens;
 
   final List<String> _titles = const [
     "Admin Dashboard",
@@ -62,15 +61,13 @@ void initState() {
         centerTitle: true,
         automaticallyImplyLeading: false, // Hides back button
         title: Text(
-  widget.complaintData != null
-      ? "Complaint Details"
-      : _titles[_currentIndex],
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-            color: Colors.white,
-          ),
-        ),
+  _titles[_currentIndex],
+  style: const TextStyle(
+    fontSize: 18,
+    fontWeight: FontWeight.w500,
+    color: Colors.white,
+  ),
+),
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications_none, color: Colors.white),
@@ -87,10 +84,8 @@ void initState() {
         ],
       ),
 
-      // Body
-      body: widget.complaintData != null
-    ? ComplaintDetailScreen(complaint: widget.complaintData!)
-    : IndexedStack(index: _currentIndex, children: _screens),
+      // body
+      body: IndexedStack(index: _currentIndex, children: _screens),
 
       // Bottom Bar
       bottomNavigationBar: BottomNavigationBar(
@@ -100,20 +95,10 @@ void initState() {
         selectedItemColor: Color(0xFF219869),
         unselectedItemColor: Colors.grey,
         onTap: (index) {
-  setState(() {
-    _currentIndex = index;
-  });
-
-  // 🔥 EXIT DETAIL MODE when tab clicked
-  if (widget.complaintData != null) {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => AdminLayout(initialIndex: index),
-      ),
-    );
-  }
-},
+          setState(() {
+            _currentIndex = index;
+          });
+        },
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.dashboard),

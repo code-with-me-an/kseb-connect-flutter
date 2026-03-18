@@ -18,7 +18,6 @@ import 'services/local_notification_service.dart';
 import 'users/notification_detail_screen.dart';
 import 'admin/admin_notification_screen.dart';
 
-import 'package:kseb_connect/services/user_realtime_service.dart';
 import 'package:kseb_connect/services/admin_realtime_service.dart';
 
 /// Global navigator key
@@ -110,7 +109,6 @@ class _MyAppState extends State<MyApp> {
       AdminRealtimeService.start(); // ADMIN ONLY
       _startScreen = const AdminLayout();
     } else if (userLoggedIn) {
-      final userId = supabase.auth.currentUser!.id;
       _startScreen = const MainLayout();
     } else {
       _startScreen = const LoginScreen();

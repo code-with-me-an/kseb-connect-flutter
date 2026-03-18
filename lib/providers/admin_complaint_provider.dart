@@ -13,10 +13,21 @@ class AdminComplaintProvider extends ChangeNotifier {
   List<Map<String, dynamic>> get personal =>
       allComplaints.where((c) => c['complaint_type'] == 'personal').toList();
 
+  Map<String, dynamic>? getComplaintById(String id) {
+    try {
+      return allComplaints.firstWhere((c) => c['complaint_id'] == id);
+    } catch (e) {
+      return null;
+    }
+  }
+
   String? sectionId;
   bool loading = true;
 
   bool _realtimeStarted = false;
+
+  double? sectionLat;
+  double? sectionLng;
 
   // =============================
   // LOAD DATA
@@ -36,6 +47,15 @@ class AdminComplaintProvider extends ChangeNotifier {
     }
 
     sectionId = currentSectionId;
+
+    final sectionData = await supabase
+        .from('sections')
+        .select('latitude, longitude')
+        .eq('section_id', currentSectionId)
+        .single();
+
+    sectionLat = sectionData['latitude'];
+    sectionLng = sectionData['longitude'];
 
     try {
       final response = await supabase
@@ -75,7 +95,7 @@ class AdminComplaintProvider extends ChangeNotifier {
                 : payload.oldRecord;
 
             if (record['section_id'] != sectionId) return;
-            
+
             loadComplaints(); // keep this for now
           },
         )

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:kseb_connect/providers/admin_complaint_provider.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:provider/provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'main_layout.dart';
+
 class AdminSectionMapScreen extends StatefulWidget {
   const AdminSectionMapScreen({super.key});
 
@@ -14,78 +15,48 @@ class AdminSectionMapScreen extends StatefulWidget {
 
 class _AdminSectionMapScreenState extends State<AdminSectionMapScreen> {
   final MapController _mapController = MapController();
-  final supabase = Supabase.instance.client;
-  DateTime? _lastFetchTime;
-  int? _selectedMarkerIndex;
-  List<dynamic> _complaints = [];
-  bool _loading = true;
+  String? _selectedComplaintId;
+  bool _mapReady = false;
 
-  @override
   @override
   void initState() {
     super.initState();
-    fetchSectionComplaints(forceRefresh: true);
-
-    Future.doWhile(() async {
-      await Future.delayed(const Duration(seconds: 30));
-      if (!mounted) return false;
-      await fetchSectionComplaints(forceRefresh: true);
-      return true;
-    });
+    context.read<AdminComplaintProvider>().loadComplaints();
   }
 
-  Future<void> fetchSectionComplaints({bool forceRefresh = false}) async {
-    if (!forceRefresh &&
-        _lastFetchTime != null &&
-        DateTime.now().difference(_lastFetchTime!).inSeconds < 30) {
-      return;
-    }
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final sectionId = prefs.getString('admin_section_id');
-
-      if (sectionId == null) {
-        if (mounted) setState(() => _loading = false);
-        return;
-      }
-
-      final response = await supabase
-          .from('complaints_with_upvotes')
-          .select()
-          .eq('section_id', sectionId);
-
-      if (mounted) {
-        setState(() {
-          _complaints = response;
-          _loading = false;
-          _lastFetchTime = DateTime.now();
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _complaints = [];
-          _loading = false;
-        });
-      }
-    }
+  double getMarkerSize(double zoom) {
+    if (zoom < 9) return 15;
+    if (zoom < 11) return 20;
+    if (zoom < 13) return 25;
+    if (zoom < 15) return 35;
+    return 42;
   }
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<AdminComplaintProvider>();
+    double zoom = _mapReady ? _mapController.camera.zoom : 13.0;
+    double markerSize = getMarkerSize(zoom);
     return Scaffold(
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
+      body: provider.loading
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF219869)))
           : Stack(
               children: [
                 FlutterMap(
                   mapController: _mapController,
                   options: MapOptions(
-                    initialCenter: LatLng(11.2588, 75.7804),
+                    initialCenter: LatLng(
+                      provider.sectionLat ?? 11.2588,
+                      provider.sectionLng ?? 75.7804,
+                    ),
                     initialZoom: 13,
+
                     onMapReady: () {
-                      fetchSectionComplaints(forceRefresh: true);
+                      _mapReady = true;
+                    },
+
+                    onPositionChanged: (position, hasGesture) {
+                      setState(() {});
                     },
                   ),
                   children: [
@@ -106,11 +77,10 @@ class _AdminSectionMapScreenState extends State<AdminSectionMapScreen> {
                       retinaMode: true,
                     ),
                     MarkerLayer(
-                      markers: _complaints
+                      markers: provider.allComplaints
                           .asMap()
                           .entries
                           .map((entry) {
-                            int index = entry.key;
                             var complaint = entry.value;
 
                             final lat = complaint['latitude'];
@@ -124,15 +94,16 @@ class _AdminSectionMapScreenState extends State<AdminSectionMapScreen> {
                                 double.parse(lat.toString()),
                                 double.parse(lng.toString()),
                               ),
-                              width: 50,
-                              height: 50,
+                              width: markerSize,
+                              height: markerSize,
                               child: GestureDetector(
                                 onTap: () {
                                   setState(() {
-                                    _selectedMarkerIndex =
-                                        _selectedMarkerIndex == index
+                                    _selectedComplaintId =
+                                        _selectedComplaintId ==
+                                            complaint['complaint_id']
                                         ? null
-                                        : index;
+                                        : complaint['complaint_id'];
                                   });
                                 },
                                 child: type == 'community'
@@ -141,17 +112,17 @@ class _AdminSectionMapScreenState extends State<AdminSectionMapScreen> {
                                         children: [
                                           SvgPicture.asset(
                                             'assets/communityicon.svg',
-                                            width: 40,
-                                            height: 40,
+                                            width: markerSize,
+                                            height: markerSize,
                                           ),
                                           Positioned(
-                                            top: 12,
+                                            top: markerSize * 0.2,
                                             child: Text(
                                               "${complaint['upvote_count'] ?? 0}",
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                 color: Colors.white,
                                                 fontWeight: FontWeight.bold,
-                                                fontSize: 15,
+                                                fontSize: markerSize * 0.35,
                                               ),
                                             ),
                                           ),
@@ -159,8 +130,8 @@ class _AdminSectionMapScreenState extends State<AdminSectionMapScreen> {
                                       )
                                     : SvgPicture.asset(
                                         "assets/personalicon.svg",
-                                        width: 25,
-                                        height: 25,
+                                        width: markerSize * 0.6,
+                                        height: markerSize * 0.6,
                                       ),
                               ),
                             );
@@ -177,16 +148,26 @@ class _AdminSectionMapScreenState extends State<AdminSectionMapScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(8),
                     color: Colors.white,
-                    child: Text("Complaints: ${_complaints.length}"),
+                    child: Text("Complaints: ${provider.allComplaints.length}"),
                   ),
                 ),
-                if (_selectedMarkerIndex != null)
+                if (_selectedComplaintId != null)
                   Positioned(
                     bottom: 20,
                     left: 20,
                     right: 20,
-                    child: _buildComplaintPopup(
-                      _complaints[_selectedMarkerIndex!],
+                    child: Builder(
+                      builder: (_) {
+                        final selectedComplaint = provider.getComplaintById(
+                          _selectedComplaintId!,
+                        );
+
+                        if (selectedComplaint == null) {
+                          return const SizedBox(); // safe fallback
+                        }
+
+                        return _buildComplaintPopup(selectedComplaint);
+                      },
                     ),
                   ),
               ],
@@ -196,83 +177,172 @@ class _AdminSectionMapScreenState extends State<AdminSectionMapScreen> {
 
   Widget _buildComplaintPopup(Map<String, dynamic> complaint) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Top Row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                "Tracking: ${complaint['tracking_code'] ?? ""}",
-                style: const TextStyle(fontWeight: FontWeight.bold),
+              Expanded(
+                child: Text(
+                  "Tracking: ${complaint['tracking_code'] ?? "N/A"}",
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () {
-                  setState(() => _selectedMarkerIndex = null);
-                },
+              GestureDetector(
+                onTap: () => setState(() => _selectedComplaintId = null),
+                child: const Icon(Icons.close, size: 18),
               ),
             ],
           ),
 
           const SizedBox(height: 6),
 
-          Text("Type: ${complaint['complaint_type']}"),
-          Text("Category: ${complaint['category']}"),
+          // Type + Category (inline)
+          Text(
+            "${complaint['complaint_type']} • ${complaint['category']}",
+            style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+          ),
 
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
 
-          Text(complaint['description'] ?? ""),
+          // Description
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // LEFT SIDE (text content)
+              Expanded(
+                child: Text(
+                  complaint['description'] ?? "",
+                  style: const TextStyle(fontSize: 14),
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+
+              // RIGHT SIDE (image)
+              if (complaint['image_url'] != null &&
+                  complaint['image_url'].toString().isNotEmpty) ...[
+                const SizedBox(width: 10),
+
+                Padding(
+                  padding: const EdgeInsets.only(right: 20),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      complaint['image_url'],
+                      height: 75,
+                      width: 100,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
 
           const SizedBox(height: 10),
 
-          if (complaint['image_url'] != null &&
-              complaint['image_url'].toString().isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  complaint['image_url'],
-                  height: 150,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
+          // Extra Details Row
+          Row(
+            children: [
+              // Upvotes (only for community)
+              if (complaint['complaint_type'] == 'community')
+                Row(
+                  children: [
+                    Icon(
+                      Icons.thumb_up_alt,
+                      size: 14,
+                      color: Colors.blue.shade600,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      "${complaint['upvote_count'] ?? 0} Upvotes",
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ],
                 ),
-              ),
-            ),
 
-          const SizedBox(height: 12),
+              const SizedBox(width: 12),
 
+              // Status
+              if (complaint['status'] != null)
+                Text(
+                  complaint['status'],
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _getStatusColor(complaint['status']),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+            ],
+          ),
+
+          const SizedBox(height: 10),
+
+          // Button
           SizedBox(
             width: double.infinity,
+            height: 40,
             child: ElevatedButton(
               onPressed: () {
-              Navigator.pushAndRemoveUntil(
-  context,
-  MaterialPageRoute(
-    builder: (_) => AdminLayout(
-      initialIndex: 1, // Complaints tab
-      highlightComplaintId: complaint['complaint_id'],
-      highlightComplaintType: complaint['complaint_type'],
-    ),
-  ),
-  (route) => false,
-);
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => AdminLayout(
+                      initialIndex: 1,
+                      highlightComplaintId: complaint['complaint_id'],
+                      highlightComplaintType: complaint['complaint_type'],
+                    ),
+                  ),
+                  (route) => false,
+                );
               },
-              child: const Text("View / Edit"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green.shade700,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                "View / Edit",
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return Colors.orange;
+      case 'resolved':
+        return Colors.green;
+      case 'rejected':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
   }
 }

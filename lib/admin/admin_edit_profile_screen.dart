@@ -131,7 +131,7 @@ class _AdminEditProfileScreenState extends State<AdminEditProfileScreen> {
         elevation: 0,
       ),
       body: loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: themeColor))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Form(
