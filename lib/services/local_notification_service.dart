@@ -68,7 +68,7 @@ class LocalNotificationService {
       isAlert ? 'kseb_alert_notifications' : 'kseb_notifications',
       isAlert ? 'KSEB Alerts' : 'KSEB Notifications',
       channelDescription: 'Notifications for complaints and alerts',
-      icon: '@drawable/kseb_notification_icon',
+      icon: '@mipmap/ic_launcher',
 
       importance: Importance.max,
       priority: Priority.max,
