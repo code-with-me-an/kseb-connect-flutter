@@ -50,6 +50,7 @@ dependencies:
   intl: ^0.20.2
   flutter_map_marker_cluster: ^8.2.2
   url_launcher: ^6.3.2
+  flutter_dotenv: ^6.0.0
 
 dev_dependencies:
   flutter_test:
@@ -82,6 +83,7 @@ flutter:
     - assets/communityicon.svg
     - assets/personalicon.svg
     - assets/power_bg.jpg
+    - .env
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

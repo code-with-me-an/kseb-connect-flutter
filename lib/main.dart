@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:kseb_connect/providers/admin_complaint_provider.dart';
 import 'package:kseb_connect/providers/admin_dashboard_provider.dart';
 import 'package:kseb_connect/providers/complaint_provider.dart';
@@ -28,10 +29,11 @@ final supabase = Supabase.instance.client;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: ".env");
 
   await Supabase.initialize(
-    url: 'https://ozfkdvalelvgrygihqxr.supabase.co',
-    anonKey: 'sb_publishable_XVYY0q-iNacej703cOQmqA_vZ9PBryl',
+    url: dotenv.env['SUPABASE_URL'] ?? '',
+    anonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '',
   );
 
   /// Initialize local notifications
