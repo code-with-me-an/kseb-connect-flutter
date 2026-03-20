@@ -104,7 +104,7 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
     }
 
     try {
-      const double radius = 0.1;
+      const double radius = 0.9;
 
       final lat = _selectedLocation!.latitude;
       final lng = _selectedLocation!.longitude;

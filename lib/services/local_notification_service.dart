@@ -19,7 +19,7 @@ class LocalNotificationService {
   // Alert notification channel (with alert sound)
   static const AndroidNotificationChannel alertChannel =
       AndroidNotificationChannel(
-    'kseb_alert_notifications',
+    'kseb_alert_notifications_v2',
     'KSEB Alerts',
     description: 'Critical alerts',
     importance: Importance.max,
@@ -65,7 +65,7 @@ class LocalNotificationService {
     String? payload,
   }) async {
     final androidDetails = AndroidNotificationDetails(
-      isAlert ? 'kseb_alert_notifications' : 'kseb_notifications',
+      isAlert ? 'kseb_alert_notifications_v2' : 'kseb_notifications',
       isAlert ? 'KSEB Alerts' : 'KSEB Notifications',
       channelDescription: 'Notifications for complaints and alerts',
       icon: '@mipmap/ic_launcher',
@@ -89,4 +89,5 @@ class LocalNotificationService {
       payload: payload,
     );
   }
+  
 }
