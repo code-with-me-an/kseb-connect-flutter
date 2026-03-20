@@ -89,14 +89,14 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
     const backgroundGrey = Color(0xFFE0E0E0); // Light grey background
     final provider = context.watch<AdminComplaintProvider>();
 
-     if (provider.loading) {
-    return Scaffold(
-      backgroundColor: backgroundGrey,
-      body: const Center(
-        child: CircularProgressIndicator(color: adminThemeColor),
-      ),
-    );
-  }
+    if (provider.loading) {
+      return Scaffold(
+        backgroundColor: backgroundGrey,
+        body: const Center(
+          child: CircularProgressIndicator(color: adminThemeColor),
+        ),
+      );
+    }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final list = isCommunitySelected ? provider.community : provider.personal;
@@ -218,7 +218,11 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
     AdminComplaintProvider provider,
   ) {
     if (provider.loading) {
-      return [const Center(child: CircularProgressIndicator(color: Color(0xFF219869)))];
+      return [
+        const Center(
+          child: CircularProgressIndicator(color: Color(0xFF219869)),
+        ),
+      ];
     }
 
     if (provider.community.isEmpty) {
@@ -227,6 +231,7 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
 
     return provider.community.map((complaint) {
       int upvoteCount = complaint['upvote_count'] ?? 0;
+      final isAwaiting = complaint['status'] == 'awaiting_assignment';
 
       return _buildComplaintCard(
         complaintId: complaint['complaint_id'],
@@ -241,6 +246,7 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
         longitude: complaint['longitude'],
         locationName: complaint['location_name'],
         highlight: _activeHighlightId == complaint['complaint_id'],
+        showDecisionButtons: isAwaiting,
       );
     }).toList();
   }
@@ -251,7 +257,11 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
     AdminComplaintProvider provider,
   ) {
     if (provider.loading) {
-      return [const Center(child: CircularProgressIndicator(color: Color(0xFF219869)))];
+      return [
+        const Center(
+          child: CircularProgressIndicator(color: Color(0xFF219869)),
+        ),
+      ];
     }
 
     if (provider.personal.isEmpty) {
@@ -294,6 +304,7 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
     String? consumerName,
     String? consumerNumber,
     bool highlight = false,
+    bool showDecisionButtons = false,
   }) {
     Color statusColor;
     IconData statusIcon;
@@ -424,6 +435,36 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
                           ),
                         ],
                       ),
+                      if (showDecisionButtons) ...[
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            ElevatedButton(
+                              onPressed: () async {
+                                await context
+                                    .read<AdminComplaintProvider>()
+                                    .updateStatus(complaintId, 'pending');
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                              ),
+                              child: const Text("Accept"),
+                            ),
+                            const SizedBox(width: 10),
+                            ElevatedButton(
+                              onPressed: () async {
+                                await context
+                                    .read<AdminComplaintProvider>()
+                                    .rejectAndReassign(complaintId);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                              ),
+                              child: const Text("Reject"),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),

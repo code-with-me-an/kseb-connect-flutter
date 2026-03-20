@@ -298,6 +298,9 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
             'longitude': longitude,
             'location_name': locationName,
             'image_url': imageUrl,
+            'status': complaintType == 'community'
+                ? 'awaiting_assignment'
+                : 'pending',
           })
           .select()
           .single();
@@ -334,6 +337,9 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
               'longitude': longitude,
               'location_name': locationName,
               'image_url': imageUrl,
+              'status': complaintType == 'community'
+                  ? 'awaiting_assignment'
+                  : 'pending',
             })
             .select()
             .single();
