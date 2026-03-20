@@ -35,7 +35,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
 
     final response = await supabase
         .from('officers')
-        .select()
+        .select('*, sections(name)')
         .eq('officer_id', adminId)
         .maybeSingle();
 
@@ -112,7 +112,32 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 8),
+
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.business, // office icon
+                        size: 18,
+                        color: Colors.grey,
+                      ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          adminData!['sections']?['name'] ??
+                              "Section not assigned",
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 20),
 
                   /// INFO
                   _buildInfoRow(
