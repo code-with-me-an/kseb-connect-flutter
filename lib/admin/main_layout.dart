@@ -51,72 +51,98 @@ class _AdminLayoutState extends State<AdminLayout> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      // Top Bar
-      appBar: AppBar(
-        backgroundColor: Color(
-          0xFF219869,
-        ), // Greenish teal for Admin distinction? Or keep Navy Blue.
-        elevation: 0,
-        centerTitle: true,
-        automaticallyImplyLeading: false, // Hides back button
-        title: Text(
-  _titles[_currentIndex],
-  style: const TextStyle(
-    fontSize: 18,
-    fontWeight: FontWeight.w500,
-    color: Colors.white,
-  ),
-),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_none, color: Colors.white),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const AdminNotificationScreen(),
-                ),
-              );
-            },
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
 
-      // body
-      body: IndexedStack(index: _currentIndex, children: _screens),
+        final navigator = Navigator.of(context);
 
-      // Bottom Bar
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: const Color.fromARGB(255, 255, 248, 248),
-        currentIndex: _currentIndex,
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: Color(0xFF219869),
-        unselectedItemColor: Colors.grey,
-        onTap: (index) {
+        /// 1. If inner route exists → pop it
+        if (navigator.canPop()) {
+          navigator.pop();
+          return;
+        }
+
+        /// 2. If not on Dashboard → go to Dashboard
+        if (_currentIndex != 0) {
           setState(() {
-            _currentIndex = index;
+            _currentIndex = 0;
           });
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard),
-            label: "Dashboard",
+          return;
+        }
+
+        /// 3. Already on Dashboard → exit app
+        navigator.pop();
+      },
+
+      child: Scaffold(
+        // Top Bar
+        appBar: AppBar(
+          backgroundColor: Color(
+            0xFF219869,
+          ), // Greenish teal for Admin distinction? Or keep Navy Blue.
+          elevation: 0,
+          centerTitle: true,
+          automaticallyImplyLeading: false, // Hides back button
+          title: Text(
+            _titles[_currentIndex],
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+              color: Colors.white,
+            ),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.chat_bubble_outline),
-            label: "Complaints",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.location_on_outlined),
-            label: "Map",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            label: "Profile",
-          ),
-        ],
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.notifications_none, color: Colors.white),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const AdminNotificationScreen(),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(width: 8),
+          ],
+        ),
+
+        // body
+        body: IndexedStack(index: _currentIndex, children: _screens),
+
+        // Bottom Bar
+        bottomNavigationBar: BottomNavigationBar(
+          backgroundColor: const Color.fromARGB(255, 255, 248, 248),
+          currentIndex: _currentIndex,
+          type: BottomNavigationBarType.fixed,
+          selectedItemColor: Color(0xFF219869),
+          unselectedItemColor: Colors.grey,
+          onTap: (index) {
+            setState(() {
+              _currentIndex = index;
+            });
+          },
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.dashboard),
+              label: "Dashboard",
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.chat_bubble_outline),
+              label: "Complaints",
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.location_on_outlined),
+              label: "Map",
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              label: "Profile",
+            ),
+          ],
+        ),
       ),
     );
   }
