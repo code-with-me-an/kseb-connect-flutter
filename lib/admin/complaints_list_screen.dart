@@ -448,7 +448,10 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.green,
                               ),
-                              child: const Text("Accept"),
+                              child: const Text(
+                                "Accept",
+                                style: TextStyle(color: Colors.white),
+                              ),
                             ),
                             const SizedBox(width: 10),
                             ElevatedButton(
@@ -460,7 +463,10 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.red,
                               ),
-                              child: const Text("Reject"),
+                              child: const Text(
+                                "Reject",
+                                style: TextStyle(color: Colors.white),
+                              ),
                             ),
                           ],
                         ),
