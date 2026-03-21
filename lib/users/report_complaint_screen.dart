@@ -35,6 +35,21 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
   bool submitting = false;
   LatLng? _cachedLocation;
 
+  final List<Map<String, String>> personalComplaintTypes = [
+    {"value": "power_outage", "label": "POWER OUTAGE"},
+    {"value": "voltage_issue", "label": "VOLTAGE ISSUE"},
+    {"value": "billing_issue", "label": "BILLING ISSUE"},
+    {"value": "meter_issue", "label": "METER ISSUE"},
+  ];
+
+  final List<Map<String, String>> communityComplaintTypes = [
+    {"value": "line_issue", "label": "LINE ISSUE"},
+    {"value": "transformer_issue", "label": "TRANSFORMER ISSUE"},
+    {"value": "street_light", "label": "STREET LIGHT"},
+    {"value": "safety_hazard", "label": "SAFETY HAZARD"},
+    {"value": "power_outage", "label": "AREA POWER OUTAGE"},
+  ];
+
   // generate the location name
 
   Future<String?> getLocationName(double lat, double lng) async {
@@ -507,6 +522,7 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
                 if (mounted) {
                   setState(() {
                     category = v;
+                    complaintType = null;
                     _selectedConsumerId = null;
                     _selectedSectionId = null;
                   });
@@ -532,25 +548,11 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
             _buildCustomDropdown(
               hint: "Select Complaint Type",
               value: complaintType,
-              items:
-                  [
-                        'power_outage',
-                        'voltage_issue',
-                        'billing_issue',
-                        'meter_issue',
-                        'line_issue',
-                        'transformer_issue',
-                        'street_light',
-                        'safety_hazard',
-                        'etc',
-                      ]
-                      .map(
-                        (e) => {
-                          "value": e,
-                          "label": e.replaceAll('_', ' ').toUpperCase(),
-                        },
-                      )
-                      .toList(),
+              items: category == "Personal"
+                  ? personalComplaintTypes
+                  : category == "Community"
+                  ? communityComplaintTypes
+                  : [],
               onChanged: (v) {
                 if (mounted) setState(() => complaintType = v);
               },
