@@ -182,24 +182,44 @@ class AdminComplaintProvider extends ChangeNotifier {
     if (lat == null || lng == null) return null;
 
     try {
-      final sections = await supabase.from('sections').select();
+      const double radius = 0.2; // slightly larger for fallback
+
+      final sections = await supabase
+          .from('sections')
+          .select('''
+          section_id,
+          latitude,
+          longitude,
+          officers!inner(
+            officer_id,
+            is_active
+          )
+        ''')
+          .eq('officers.is_active', true)
+          .gte('latitude', lat - radius)
+          .lte('latitude', lat + radius)
+          .gte('longitude', lng - radius)
+          .lte('longitude', lng + radius)
+          .eq('is_active', true);
 
       String? nearestId;
       double minDistance = double.infinity;
 
       for (var section in sections) {
-        if (rejectedSections.contains(section['section_id'])) continue;
+        final id = section['section_id'];
+
+        if (rejectedSections.contains(id)) continue;
 
         final sLat = section['latitude'];
         final sLng = section['longitude'];
 
         if (sLat == null || sLng == null) continue;
 
-        final distance = sqrt(pow(lat - sLat, 2) + pow(lng - sLng, 2));
+        final distance = _calculateDistance(lat, lng, sLat, sLng);
 
         if (distance < minDistance) {
           minDistance = distance;
-          nearestId = section['section_id'];
+          nearestId = id;
         }
       }
 
@@ -208,5 +228,31 @@ class AdminComplaintProvider extends ChangeNotifier {
       debugPrint("Section find error: $e");
       return null;
     }
+  }
+
+  double _calculateDistance(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
+    const double earthRadius = 6371; // in KM
+
+    double dLat = _deg2rad(lat2 - lat1);
+    double dLon = _deg2rad(lon2 - lon1);
+
+    double a =
+        (sin(dLat / 2) * sin(dLat / 2)) +
+        cos(_deg2rad(lat1)) *
+            cos(_deg2rad(lat2)) *
+            (sin(dLon / 2) * sin(dLon / 2));
+
+    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+
+    return earthRadius * c; // Distance in KM
+  }
+
+  double _deg2rad(double deg) {
+    return deg * (pi / 180);
   }
 }
