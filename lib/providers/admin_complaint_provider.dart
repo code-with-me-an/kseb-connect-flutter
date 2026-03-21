@@ -127,66 +127,79 @@ class AdminComplaintProvider extends ChangeNotifier {
   }
 
   Future<void> rejectAndReassign(String complaintId) async {
-    try {
-      final complaint = allComplaints.firstWhere(
-        (c) => c['complaint_id'] == complaintId,
-      );
+  try {
+    // 🔹 Always fetch latest complaint from DB (avoid stale data)
+    final latestComplaint = await supabase
+        .from('complaints')
+        .select()
+        .eq('complaint_id', complaintId)
+        .single();
 
-      // 🔹 Get rejected sections
-      List rejected = complaint['rejected_sections'] ?? [];
-      rejected = List.from(rejected);
+    // 🔹 Normalize rejected_sections to Set<String>
+    final Set<String> rejected =
+        (latestComplaint['rejected_sections'] as List? ?? [])
+            .map((e) => e.toString())
+            .toSet();
 
-      // 🔹 Add current section
-      rejected.add(complaint['section_id']);
+    // 🔹 Add current section
+    final currentSectionId =
+        latestComplaint['section_id'].toString();
+    rejected.add(currentSectionId);
 
-      // 🔹 Find next nearest section
-      final nextSectionId = await findNextNearestSection(
-        complaint['latitude'],
-        complaint['longitude'],
-        rejected,
-      );
+    // 🔹 Find next nearest section
+    final nextSectionId = await findNextNearestSection(
+      latestComplaint['latitude'],
+      latestComplaint['longitude'],
+      rejected.toList(),
+    );
 
-      if (nextSectionId == null) {
-        debugPrint("No available section to reassign");
-        return;
-      }
-
-      // 🔥 Update complaint
-      await supabase
-          .from('complaints')
-          .update({
-            'section_id': nextSectionId,
-            'rejected_sections': rejected,
-            'status': 'awaiting_assignment',
-          })
-          .eq('complaint_id', complaintId);
-
-      // 🔔 Optional: notify user
-      await supabase.from('notifications').insert({
-        'complaint_id': complaintId,
-        'user_id': complaint['user_id'],
-        'recipient_type': 'user',
-        'title': 'Complaint Reassigned',
-        'message': 'Your complaint is being reassigned to another section',
-      });
-    } catch (e) {
-      debugPrint("Reject error: $e");
+    if (nextSectionId == null) {
+      debugPrint("No available section to reassign");
+      return;
     }
+
+    // 🔹 Update complaint safely
+    await supabase
+        .from('complaints')
+        .update({
+          'section_id': nextSectionId,
+          'rejected_sections': rejected.toList(),
+          'status': 'awaiting_assignment',
+        })
+        .eq('complaint_id', complaintId);
+
+    // 🔔 Notify user
+    await supabase.from('notifications').insert({
+      'complaint_id': complaintId,
+      'user_id': latestComplaint['user_id'],
+      'recipient_type': 'user',
+      'title': 'Complaint Reassigned',
+      'message':
+          'Your complaint is being reassigned to another section',
+    });
+
+  } catch (e) {
+    debugPrint("Reject error: $e");
   }
+}
 
   Future<String?> findNextNearestSection(
-    double? lat,
-    double? lng,
-    List rejectedSections,
-  ) async {
-    if (lat == null || lng == null) return null;
+  double? lat,
+  double? lng,
+  List rejectedSections,
+) async {
+  if (lat == null || lng == null) return null;
 
-    try {
-      const double radius = 0.2; // slightly larger for fallback
+  try {
+    const double radius = 0.2;
 
-      final sections = await supabase
-          .from('sections')
-          .select('''
+    // 🔹 Normalize rejected list once (IMPORTANT)
+    final Set<String> rejectedSet =
+        rejectedSections.map((e) => e.toString()).toSet();
+
+    final sections = await supabase
+        .from('sections')
+        .select('''
           section_id,
           latitude,
           longitude,
@@ -195,40 +208,41 @@ class AdminComplaintProvider extends ChangeNotifier {
             is_active
           )
         ''')
-          .eq('officers.is_active', true)
-          .gte('latitude', lat - radius)
-          .lte('latitude', lat + radius)
-          .gte('longitude', lng - radius)
-          .lte('longitude', lng + radius)
-          .eq('is_active', true);
+        .eq('officers.is_active', true)
+        .gte('latitude', lat - radius)
+        .lte('latitude', lat + radius)
+        .gte('longitude', lng - radius)
+        .lte('longitude', lng + radius)
+        .eq('is_active', true);
 
-      String? nearestId;
-      double minDistance = double.infinity;
+    String? nearestId;
+    double minDistance = double.infinity;
 
-      for (var section in sections) {
-        final id = section['section_id'];
+    for (var section in sections) {
+      final id = section['section_id'].toString();
 
-        if (rejectedSections.contains(id)) continue;
+      // 🔴 Critical fix: proper comparison
+      if (rejectedSet.contains(id)) continue;
 
-        final sLat = section['latitude'];
-        final sLng = section['longitude'];
+      final sLat = section['latitude'];
+      final sLng = section['longitude'];
 
-        if (sLat == null || sLng == null) continue;
+      if (sLat == null || sLng == null) continue;
 
-        final distance = _calculateDistance(lat, lng, sLat, sLng);
+      final distance = _calculateDistance(lat, lng, sLat, sLng);
 
-        if (distance < minDistance) {
-          minDistance = distance;
-          nearestId = id;
-        }
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearestId = id;
       }
-
-      return nearestId;
-    } catch (e) {
-      debugPrint("Section find error: $e");
-      return null;
     }
+
+    return nearestId;
+  } catch (e) {
+    debugPrint("Section find error: $e");
+    return null;
   }
+}
 
   double _calculateDistance(
     double lat1,
