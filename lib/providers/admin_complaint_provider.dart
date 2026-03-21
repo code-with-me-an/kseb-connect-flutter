@@ -164,7 +164,7 @@ class AdminComplaintProvider extends ChangeNotifier {
         .update({
           'section_id': nextSectionId,
           'rejected_sections': rejected.toList(),
-          'status': 'awaiting_assignment',
+          'status': 'awaiting',
         })
         .eq('complaint_id', complaintId);
 

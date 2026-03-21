@@ -26,9 +26,9 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
 
   Future<void> startRealtime() async {
     final prefs = await SharedPreferences.getInstance();
-  final userId = prefs.getString('user_id');
+    final userId = prefs.getString('user_id');
 
-  if (userId == null) return;
+    if (userId == null) return;
 
     _channel = supabase
         .channel('realtime:user_complaints')
@@ -272,12 +272,12 @@ class _MyComplaintsScreenState extends State<MyComplaintsScreen> {
     if (mounted) setState(() => loading = true);
 
     final prefs = await SharedPreferences.getInstance();
-final userId = prefs.getString('user_id');
+    final userId = prefs.getString('user_id');
 
-if (userId == null) {
-  if (mounted) setState(() => loading = false);
-  return;
-}
+    if (userId == null) {
+      if (mounted) setState(() => loading = false);
+      return;
+    }
 
     try {
       final response = await supabase
@@ -294,14 +294,16 @@ if (userId == null) {
           complaints.sort((a, b) {
             int getPriority(String? status) {
               switch (status) {
+                case "awaiting":
+                  return 0; // 🔥 TOP PRIORITY
                 case "pending":
-                  return 0; // top
+                  return 1;
                 case "in-progress":
-                  return 1; // middle
+                  return 2;
                 case "resolved":
-                  return 2; // bottom
-                default:
                   return 3;
+                default:
+                  return 4;
               }
             }
 
@@ -313,7 +315,7 @@ if (userId == null) {
               return statusCompare;
             }
 
-            // If status is same → sort by created_at (latest first)
+            // same status → latest first
             DateTime dateA = DateTime.parse(a['created_at']);
             DateTime dateB = DateTime.parse(b['created_at']);
 
@@ -346,7 +348,9 @@ if (userId == null) {
     return Scaffold(
       backgroundColor: Colors.white,
       body: loading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF0D3B66),))
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFF0D3B66)),
+            )
           : RefreshIndicator(
               color: const Color(0xFF0D3B66), // Your theme color
               onRefresh: fetchComplaints, // Calls API again
@@ -409,11 +413,12 @@ if (userId == null) {
         return Colors.grey;
     }
   }
+
   @override
-void dispose() {
-  _channel?.unsubscribe();
-  super.dispose();
-}
+  void dispose() {
+    _channel?.unsubscribe();
+    super.dispose();
+  }
 }
 
 // --- Custom Complaint Card Widget ---

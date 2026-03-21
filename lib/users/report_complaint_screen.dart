@@ -314,7 +314,7 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
             'location_name': locationName,
             'image_url': imageUrl,
             'status': complaintType == 'community'
-                ? 'awaiting_assignment'
+                ? 'awaiting'
                 : 'pending',
           })
           .select()
@@ -353,7 +353,7 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
               'location_name': locationName,
               'image_url': imageUrl,
               'status': complaintType == 'community'
-                  ? 'awaiting_assignment'
+                  ? 'awaiting'
                   : 'pending',
             })
             .select()

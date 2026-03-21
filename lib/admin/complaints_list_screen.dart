@@ -231,7 +231,7 @@ class _ComplaintsListScreenState extends State<ComplaintsListScreen> {
 
     return provider.community.map((complaint) {
       int upvoteCount = complaint['upvote_count'] ?? 0;
-      final isAwaiting = complaint['status'] == 'awaiting_assignment';
+      final isAwaiting = complaint['status'] == 'awaiting';
 
       return _buildComplaintCard(
         complaintId: complaint['complaint_id'],
