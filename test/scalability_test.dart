@@ -140,15 +140,15 @@ void main() {
   test('Concurrent complaint submissions', () async {
     const totalUsers = 10;
 
-    final stopwatch = Stopwatch()..start(); // ⏱ start timing
+    final stopwatch = Stopwatch()..start(); //start timing
 
     await Future.wait(List.generate(totalUsers, (i) => submitFakeComplaint(i)));
 
-    stopwatch.stop(); // ⏱ stop timing
+    stopwatch.stop(); //stop timing
 
-    print('⏱ Total Time: ${stopwatch.elapsedMilliseconds} ms');
-    print(' Success: ${createdIds.length}');
-    print(' Failed: ${failedIndexes.length}');
+    print('Total Time: ${stopwatch.elapsedMilliseconds} ms');
+    print('Success: ${createdIds.length}');
+    print('Failed: ${failedIndexes.length}');
 
     expect(createdIds.length, totalUsers);
   });
