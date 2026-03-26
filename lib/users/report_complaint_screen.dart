@@ -561,7 +561,7 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
             const SizedBox(height: 15),
 
             // ======================
-            // 🔥 IMPROVEMENT 5: Show Consumer Dropdown ONLY if Personal
+            //  IMPROVEMENT 5: Show Consumer Dropdown ONLY if Personal
             // ======================
             if (category == "Personal") ...[
               if (isLoadingConsumers)
