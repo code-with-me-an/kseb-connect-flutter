@@ -31,8 +31,7 @@ void main() {
       List.generate(3, (_) => random.nextInt(26) + 65),
     );
 
-    String numbers =
-        random.nextInt(100000).toString().padLeft(5, '0');
+    String numbers = random.nextInt(100000).toString().padLeft(5, '0');
 
     return letters + numbers;
   }
@@ -42,12 +41,7 @@ void main() {
   /// ===============================
   double _deg2rad(double deg) => deg * (pi / 180);
 
-  double calculateDistance(
-    double lat1,
-    double lon1,
-    double lat2,
-    double lon2,
-  ) {
+  double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
     const earthRadius = 6371;
 
     double dLat = _deg2rad(lat2 - lat1);
@@ -67,8 +61,7 @@ void main() {
   /// ===============================
   /// FIND NEAREST SECTION
   /// ===============================
-  Future<String?> findNearestSection(
-      double userLat, double userLng) async {
+  Future<String?> findNearestSection(double userLat, double userLng) async {
     final sections = await supabase
         .from('sections')
         .select('section_id, latitude, longitude');
@@ -103,43 +96,43 @@ void main() {
   /// ===============================
   /// INSERT TEST COMPLAINT
   /// ===============================
- Future<void> submitFakeComplaint(int userIndex) async {
-  try {
-    final lat = 10.0 + Random().nextDouble();
-    final lng = 76.0 + Random().nextDouble();
+  Future<void> submitFakeComplaint(int userIndex) async {
+    try {
+      final lat = 10.0 + Random().nextDouble();
+      final lng = 76.0 + Random().nextDouble();
 
-    final sectionId = await findNearestSection(lat, lng);
+      final sectionId = await findNearestSection(lat, lng);
 
-    print(" User $userIndex → Section: $sectionId");
+      print(" User $userIndex → Section: $sectionId");
 
-    if (sectionId == null) {
-      throw Exception("No section found");
+      if (sectionId == null) {
+        throw Exception("No section found");
+      }
+
+      final response = await supabase
+          .from('complaints')
+          .insert({
+            'tracking_code': generateTrackingCode(),
+            'user_id': 'f5dbc99e-3e21-4d46-b0c0-1b6889592bf4', // HARD CODE
+            'section_id': sectionId,
+            'complaint_type': 'community',
+            'category': 'line_issue',
+            'description': 'Test complaint $userIndex',
+            'latitude': lat,
+            'longitude': lng,
+            'status': 'awaiting', // FIXED
+          })
+          .select()
+          .single();
+
+      print(" Inserted: ${response['complaint_id']}");
+
+      createdIds.add(response['complaint_id']);
+    } catch (e) {
+      failedIndexes.add(userIndex);
+      print(" Error for user $userIndex: $e");
     }
-
-    final response = await supabase
-        .from('complaints')
-        .insert({
-          'tracking_code': generateTrackingCode(),
-          'user_id': 'f5dbc99e-3e21-4d46-b0c0-1b6889592bf4', // HARD CODE
-          'section_id': sectionId,
-          'complaint_type': 'community',
-          'category': 'line_issue',
-          'description': 'Test complaint $userIndex',
-          'latitude': lat,
-          'longitude': lng,
-          'status': 'awaiting', // FIXED
-        })
-        .select()
-        .single();
-
-    print(" Inserted: ${response['complaint_id']}");
-
-    createdIds.add(response['complaint_id']);
-  } catch (e) {
-    failedIndexes.add(userIndex);
-    print(" Error for user $userIndex: $e");
   }
-}
 
   /// ===============================
   /// TEST CASE
@@ -147,12 +140,15 @@ void main() {
   test('Concurrent complaint submissions', () async {
     const totalUsers = 10;
 
-    await Future.wait(
-      List.generate(totalUsers, (i) => submitFakeComplaint(i)),
-    );
+    final stopwatch = Stopwatch()..start(); //start timing
 
-    print(' Success: ${createdIds.length}');
-    print(' Failed: ${failedIndexes.length}');
+    await Future.wait(List.generate(totalUsers, (i) => submitFakeComplaint(i)));
+
+    stopwatch.stop(); //stop timing
+
+    print('Total Time: ${stopwatch.elapsedMilliseconds} ms');
+    print('Success: ${createdIds.length}');
+    print('Failed: ${failedIndexes.length}');
 
     expect(createdIds.length, totalUsers);
   });
