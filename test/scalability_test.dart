@@ -97,48 +97,58 @@ void main() {
   /// INSERT TEST COMPLAINT
   /// ===============================
   Future<void> submitFakeComplaint(int userIndex) async {
-    try {
-      final lat = 10.0 + Random().nextDouble();
-      final lng = 76.0 + Random().nextDouble();
+  try {
+    final locations = [
+      {"lat": 11.2855, "lng": 75.7650},
+      {"lat": 11.2870, "lng": 75.7585},
+      {"lat": 11.2900, "lng": 75.7705},
+      {"lat": 11.2830, "lng": 75.7620},
+      {"lat": 11.2890, "lng": 75.7680},
+      {"lat": 11.2860, "lng": 75.7720},
+    ];
 
-      final sectionId = await findNearestSection(lat, lng);
+    final loc = locations[userIndex % locations.length];
+    final lat = loc["lat"]!;
+    final lng = loc["lng"]!;
 
-      print(" User $userIndex → Section: $sectionId");
+    final sectionId = await findNearestSection(lat, lng);
 
-      if (sectionId == null) {
-        throw Exception("No section found");
-      }
+    print(" User $userIndex → Section: $sectionId");
 
-      final response = await supabase
-          .from('complaints')
-          .insert({
-            'tracking_code': generateTrackingCode(),
-            'user_id': 'f5dbc99e-3e21-4d46-b0c0-1b6889592bf4', // HARD CODE
-            'section_id': sectionId,
-            'complaint_type': 'community',
-            'category': 'line_issue',
-            'description': 'Test complaint $userIndex',
-            'latitude': lat,
-            'longitude': lng,
-            'status': 'awaiting', // FIXED
-          })
-          .select()
-          .single();
-
-      print(" Inserted: ${response['complaint_id']}");
-
-      createdIds.add(response['complaint_id']);
-    } catch (e) {
-      failedIndexes.add(userIndex);
-      print(" Error for user $userIndex: $e");
+    if (sectionId == null) {
+      throw Exception("No section found");
     }
+
+    final response = await supabase
+        .from('complaints')
+        .insert({
+          'tracking_code': generateTrackingCode(),
+          'user_id': 'f5dbc99e-3e21-4d46-b0c0-1b6889592bf4',
+          'section_id': sectionId,
+          'complaint_type': 'community',
+          'category': 'line_issue',
+          'description': 'Test complaint $userIndex',
+          'latitude': lat,
+          'longitude': lng,
+          'status': 'awaiting',
+        })
+        .select()
+        .single();
+
+    print(" Inserted: ${response['complaint_id']}");
+
+    createdIds.add(response['complaint_id']);
+  } catch (e) {
+    failedIndexes.add(userIndex);
+    print(" Error for user $userIndex: $e");
   }
+}
 
   /// ===============================
   /// TEST CASE
   /// ===============================
   test('Concurrent complaint submissions', () async {
-    const totalUsers = 10;
+    const totalUsers = 160;
 
     final stopwatch = Stopwatch()..start(); //start timing
 
