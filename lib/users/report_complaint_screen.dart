@@ -40,6 +40,7 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
     {"value": "voltage_issue", "label": "VOLTAGE ISSUE"},
     {"value": "billing_issue", "label": "BILLING ISSUE"},
     {"value": "meter_issue", "label": "METER ISSUE"},
+    {"value": "other", "label": "OTHER"},
   ];
 
   final List<Map<String, String>> communityComplaintTypes = [
@@ -48,6 +49,7 @@ class _ReportComplaintScreenState extends State<ReportComplaintScreen> {
     {"value": "street_light", "label": "STREET LIGHT"},
     {"value": "safety_hazard", "label": "SAFETY HAZARD"},
     {"value": "power_outage", "label": "AREA POWER OUTAGE"},
+    {"value": "other", "label": "OTHER"},
   ];
 
   // generate the location name

@@ -117,7 +117,11 @@ class HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     if (home.loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFF0D3B66),)));
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFF0D3B66)),
+        ),
+      );
     }
     const orangeColor = Color(0xFFE85842); // For Report Button
     double headerRevealHeight = 200;
@@ -535,41 +539,52 @@ class HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Text(
-                          title,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        if (badgeText.isNotEmpty) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: badgeColor,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
+                    // LEFT SIDE (Title + Badge)
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Expanded(
                             child: Text(
-                              badgeText,
-                              style: TextStyle(
-                                fontSize: 10,
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 14,
                                 fontWeight: FontWeight.bold,
-                                color: badgeTextColor,
+                                color: Colors.black87,
                               ),
                             ),
                           ),
+
+                          if (badgeText.isNotEmpty) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: badgeColor,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                badgeText,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: badgeTextColor,
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
+
+                    // RIGHT SIDE (Date)
                     Text(
                       date,
                       style: TextStyle(
@@ -582,6 +597,8 @@ class HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 6),
                 Text(
                   text,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 13,
                     color: Colors.black87,
