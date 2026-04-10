@@ -1,174 +1,156 @@
-# KSEB Connect
+<p align="center">
+  <img src="readme/logo.png" alt="KSEB Connect Logo" width=300"/>
+</p>
+<!-- <h1 align="center">⚡ KSEB Connect</h1> -->
+<p align="center" style="color:grey">
+  A Smart Complaint Management System for Electricity Services
+</p>
 
-KSEB Connect is a complaint registration, tracking and management Flutter app for KSEB (Kerala State Electricity Board). The app allows administrators and users to register complaints, track their status, and manage complaint workflows. It also includes a community complaint feature where users can view complaints submitted by others and upvote complaints they also face.
+<p align="center">
+  <img src="https://img.shields.io/badge/Flutter-Mobile-blue?logo=flutter"/>
+  <img src="https://img.shields.io/badge/Backend-Supabase-green?logo=supabase"/>
+  <img src="https://img.shields.io/badge/Database-PostgreSQL-blue?logo=postgresql"/>
+  <img src="https://img.shields.io/badge/Status-Active-success"/>
+</p>
 
-## Key Features
+---
 
-- Complaint registration and tracking for KSEB services.
-- Admin dashboard for managing and updating complaint statuses.
-- Community complaints: view all user-submitted complaints and upvote the same complaint if affected.
-- User profile and complaint history.
-- Push notifications and real-time updates (if configured).
+## 📌 Overview
 
-## Project Structure
+**KSEB Connect** is a mobile-based complaint management system designed to improve the way electricity-related issues are reported, tracked, and resolved.
 
-This repository is a Flutter project. Main app code is under `lib/` and Android-specific files under `android/`.
+It bridges the gap between **consumers and electricity authorities** by introducing a **location-based, transparent, and community-driven system**.
 
-## Requirements
+---
 
-- Flutter SDK (stable)
-- Android SDK and platform-tools (ADB)
-- A connected Android device or emulator
+## 🚀 Features
 
-## Useful Commands
+### 👤 User Features
+- Report electricity issues (power failure, line damage, transformer faults, etc.)
+- Attach images for better clarity
+- Auto-detect location using GPS
+- automatically assigns complaint to the nearest section office
+- View nearby complaints on map
+- Upvote complaints to highlight critical issues
+- Track complaint status in real-time
 
-Run these commands from the project root.
+### 🛠 Admin Features
+- Map-based complaint monitoring dashboard
+- View and prioritize complaints
+- Update complaint status (Pending → In Progress → Resolved)
+- Reassign complaints to different section offices
+- Send alerts and announcements to users
 
-### Flutter: common development commands
+---
 
-```bash
-# Fetch dependencies
-flutter pub get
+## ⚙️ How It Works
 
-# Run the app on the default device or an attached device (choose device with `flutter devices`)
-flutter run
+1. User logs into the application  
+2. Reports a complaint with:
+   - Location (GPS-based)
+   - Description
+   - Optional image  
+3. System:
+   - Stores complaint in database  
+   - Assigns it to nearest section office  
+4. Nearby users:
+   - Can view and upvote complaints  
+5. Admin:
+   - Monitors complaints via dashboard  
+   - Updates status  
+6. User receives real-time notifications  
 
-# Run on a specific device by id
-flutter run -d <deviceId>
+---
 
-# Build an Android APK (debug/release)
-flutter build apk --debug
-flutter build apk --release
+## 🧩 System Architecture Diagram
 
-# Build an Android App Bundle for Play Store
-flutter build appbundle --release
+<p align="center">
+  <img src="readme/architecture.png" alt="KSEB Connect architecture" width=600"/>
+</p>
 
-# Analyze code for issues
-flutter analyze
+---
 
-# Run tests
-flutter test
+## 🏗 Modules
 
-# Format Dart code
-flutter format .
+- **User Module** – Registration, login, complaint reporting  
+- **Location Module** – GPS detection & mapping  
+- **Community Module** – Nearby complaints & upvotes  
+- **Admin Module** – Complaint management dashboard  
+- **Notification Module** – Real-time updates  
 
-# Clean build artifacts
-flutter clean
+---
 
-# List available emulators and launch one
-flutter emulators
-flutter emulators --launch <emulatorId>
+## 🛠 Tech Stack
 
-# List connected devices
-flutter devices
+| Category        | Technology Used        |
+|----------------|----------------------|
+| Mobile App     | Flutter (Dart)       |
+| Backend        | Supabase             |
+| Database       | PostgreSQL           |
+| Maps           | OpenStreetMap / APIs |
+| Tools          | Android Studio, VS Code |
 
-#regenerate development folder
-flutter create .
+---
 
-#installing the app
-flutter build apk --release
-adb install build/app/outputs/flutter-apk/app-release.apk
-```
+## 📲 Download APK
 
-### ADB: connect and device management (Android)
+👉 **Try the App:**  
+[Download APK](https://github.com/code-with-me-an/kseb-connect-flutter/releases/download/V1.1.1/app-release.apk)
 
-Use these to connect devices over USB or TCP/IP. On Windows, ensure device drivers are installed and USB debugging is enabled in Developer Options.
+---
 
-```bash
-# List devices (USB and TCP)
-adb devices
+## 📸 Screenshots
 
-# If using USB and connection doesn't show, restart server
-adb kill-server
-adb start-server
+<p align="center">
+<img src="readme/screen.gif" width="300"/>
+</p>
+---
 
-# For wireless debugging: enable TCP/IP on the device (via USB first)
-adb usb
-adb tcpip 5555
-# Then connect to device IP
-adb connect <device-ip>:5555
+## 🔐 Non-Functional Highlights
 
-# Example: adb connect 192.168.1.10:5555
+- Fast response time (few seconds)
+- Secure authentication system
+- Scalable backend architecture
+- User-friendly UI/UX
+- Reliable performance under load
 
-# Show logs
-adb logcat
+---
 
-# Forward a device port to host (if needed)
-adb reverse tcp:8081 tcp:8081
+## 🎯 Problem Solved
 
-# Disconnect wireless
-adb disconnect <device-ip>:5555
-```
+Traditional systems:
+- ❌ Slow complaint handling  
+- ❌ No transparency  
+- ❌ No prioritization  
 
-Notes:
-- Replace `<deviceId>` and `<device-ip>` with actual values. Use `flutter devices` or `adb devices` to list IDs and IPs.
-- For wireless: connect device via USB first to enable `adb tcpip` or use the device's Wireless Debugging feature (Android 11+).
+KSEB Connect:
+- ✅ Location-based reporting  
+- ✅ User-driven prioritization  
+- ✅ Real-time tracking  
+- ✅ Better communication  
 
-## Running the app on an Android device (example)
+---
 
-1. Ensure dependencies are installed: `flutter pub get`.
-2. Start an emulator or connect a device (`flutter devices` to verify).
-3. Run:
+## 👨‍💻 Team
 
-```bash
-flutter run -d <deviceId>
-```
+- Abhiram R  
+- Adithyan N  
+- Ananthu T P  
+- Anjana M M  
 
-### Git: common repository commands
+---
 
-Use these commands for typical workflows: creating branches, pushing, merging, resolving conflicts, and undoing changes.
+## 📄 License
 
-```bash
-# Create and switch to a new branch
-git checkout -b feature/<name>
+This project is developed as a **mini project** for academic purposes only and is not affiliated with or endorsed by Kerala State Electricity Board (KSEB).
 
-# Stage and commit changes
-git add .
-git commit -m "Short, clear message"
+---
 
-# Push branch to remote and set upstream
-git push -u origin feature/<name>
+## 📬 Contact
 
-# Update local main and rebase or merge into your branch
-git fetch origin
-git checkout main
-git pull origin main
-git checkout feature/<name>
-git rebase origin/main   # or `git merge origin/main`
+For queries or collaboration:  
+📧 *(code.with.me.an@gmail.com)*
 
-# Merge a feature branch into main (locally)
-git checkout main
-git merge --no-ff feature/<name>
-git push origin main
+---
 
-# Resolve merge conflicts: edit files, then
-git add <file>
-git commit
-
-# Undo changes (working tree)
-git restore <file>            # discard changes in working dir
-git restore --staged <file>   # unstage
-
-# Undo last commit but keep changes staged
-git reset --soft HEAD~1
-
-# Undo last commit and discard changes
-git reset --hard HEAD~1
-
-# Revert a pushed commit (creates a new commit)
-git revert <commit-hash>
-
-# Recover lost commits (use reflog)
-git reflog
-git checkout -b recover/<name> <commit-hash>
-
-# Re-apply a commit (cherry-pick)
-git cherry-pick <commit-hash>
-```
-
-## Contribution & Next Steps
-
-- Implement tests and CI for builds.
-- Add README sections for environment setup, screenshots, and deployment when available.
-
-
+⭐ If you like this project, give it a star!
